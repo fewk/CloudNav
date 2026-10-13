@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
-  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X
+  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame
 } from 'lucide-react';
 import {
   DndContext,
@@ -43,6 +43,14 @@ import QRCodeModal from './components/QRCodeModal';
 const GITHUB_REPO_URL = 'https://github.com/aabacada/CloudNav-abcd';
 
 const LOCAL_STORAGE_KEY = 'cloudnav_data_cache';
+const DEFAULT_SEARCH_SOURCES: ExternalSearchSource[] = [
+  { id: 'baidu', name: '百度', url: 'https://www.baidu.com/s?wd={query}', icon: 'Globe', enabled: true, createdAt: 1 },
+  { id: 'google', name: 'Google', url: 'https://www.google.com/search?q={query}', icon: 'Search', enabled: true, createdAt: 2 },
+  { id: 'bing', name: '必应', url: 'https://www.bing.com/search?q={query}', icon: 'Search', enabled: true, createdAt: 3 },
+  { id: 'github', name: 'GitHub', url: 'https://github.com/search?q={query}', icon: 'Github', enabled: true, createdAt: 4 },
+  { id: 'bilibili', name: 'B站', url: 'https://search.bilibili.com/all?keyword={query}', icon: 'Play', enabled: true, createdAt: 5 },
+];
+
 const AUTH_KEY = 'cloudnav_auth_token';
 const WEBDAV_CONFIG_KEY = 'cloudnav_webdav_config';
 const AI_CONFIG_KEY = 'cloudnav_ai_config';
@@ -59,7 +67,7 @@ function App() {
   
   // Search Mode State
   const [searchMode, setSearchMode] = useState<SearchMode>('external');
-  const [externalSearchSources, setExternalSearchSources] = useState<ExternalSearchSource[]>([]);
+  const [externalSearchSources, setExternalSearchSources] = useState<ExternalSearchSource[]>(DEFAULT_SEARCH_SOURCES);
   const [isLoadingSearchConfig, setIsLoadingSearchConfig] = useState(true);
   
   // Category Security State
@@ -127,7 +135,9 @@ function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
   // Sort State
-  const [isSortingMode, setIsSortingMode] = useState<string | null>(null); // 存储正在排序的分类ID，null表示不在排序模式
+  const [isSortingMode, setIsSortingMode] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string>('pinned');
+  const contentScrollRef = useRef<HTMLDivElement>(null); // 存储正在排序的分类ID，null表示不在排序模式
   const [isSortingPinned, setIsSortingPinned] = useState(false); // 是否正在排序置顶链接
   
   // Batch Edit State
@@ -1419,7 +1429,7 @@ function App() {
   // 搜索源选择弹出窗口状态
   const [showSearchSourcePopup, setShowSearchSourcePopup] = useState(false);
   const [hoveredSearchSource, setHoveredSearchSource] = useState<ExternalSearchSource | null>(null);
-  const [selectedSearchSource, setSelectedSearchSource] = useState<ExternalSearchSource | null>(null);
+  const [selectedSearchSource, setSelectedSearchSource] = useState<ExternalSearchSource | null>(DEFAULT_SEARCH_SOURCES[0]);
   const [isIconHovered, setIsIconHovered] = useState(false);
   const [isPopupHovered, setIsPopupHovered] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1452,21 +1462,99 @@ function App() {
     };
   }, [isIconHovered, isPopupHovered]);
 
-  // 处理搜索源选择
-  const handleSearchSourceSelect = async (source: ExternalSearchSource) => {
-    // 更新选中的搜索源
-    setSelectedSearchSource(source);
-    
-    // 保存选中的搜索源到KV空间
-    await handleSaveSearchConfig(externalSearchSources, searchMode, source);
-    
-    if (searchQuery.trim()) {
-      const searchUrl = source.url.replace('{query}', encodeURIComponent(searchQuery));
+  // 优设导航热门标签计算
+  const topHotTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    links.forEach(link => {
+      if (link.tags && Array.isArray(link.tags)) {
+        link.tags.forEach(t => {
+          const clean = t.trim();
+          if (clean) tagCounts.set(clean, (tagCounts.get(clean) || 0) + 1);
+        });
+      }
+    });
+    const sorted = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag]) => tag);
+    if (sorted.length === 0) {
+      return ['AI', '设计神器', '前端开发', '效率工具'];
+    }
+    return sorted;
+  }, [links]);
+
+  // 搜索提交按钮文案
+  const submitButtonText = useMemo(() => {
+    if (searchMode === 'internal') return '站内搜索';
+    const cur = selectedSearchSource || externalSearchSources.find(s => s.enabled) || DEFAULT_SEARCH_SOURCES[0];
+    if (cur.id === 'baidu' || cur.name.includes('百度')) return '百度一下';
+    if (cur.id === 'google' || cur.name.toLowerCase().includes('google')) return 'Google 搜索';
+    if (cur.id === 'bing' || cur.name.includes('必应')) return '必应搜索';
+    return `${cur.name} 搜索`;
+  }, [searchMode, selectedSearchSource, externalSearchSources]);
+
+  // 切换搜索引擎
+  const handleSwitchEngine = (source: ExternalSearchSource | 'internal') => {
+    if (source === 'internal') {
+      setSearchMode('internal');
+      handleSaveSearchConfig(externalSearchSources, 'internal', selectedSearchSource);
+    } else {
+      setSearchMode('external');
+      setSelectedSearchSource(source);
+      handleSaveSearchConfig(externalSearchSources, 'external', source);
+    }
+  };
+
+  // 触发搜索
+  const handleTriggerSearch = () => {
+    if (!searchQuery.trim()) return;
+    if (searchMode === 'external') {
+      const current = selectedSearchSource || externalSearchSources.find(s => s.enabled) || DEFAULT_SEARCH_SOURCES[0];
+      const searchUrl = current.url.replace('{query}', encodeURIComponent(searchQuery));
       window.open(searchUrl, '_blank');
     }
+  };
+
+  // 滚动监听
+  const handleContentScroll = () => {
+    if (!contentScrollRef.current) return;
+    const container = contentScrollRef.current;
+    const scrollY = container.scrollTop;
+    
+    const sectionIds = ['pinned', ...categories.filter(c => !c.parentId).map(c => `cat-${c.id}`)];
+    
+    for (const secId of sectionIds) {
+      const el = document.getElementById(secId);
+      if (el) {
+        const top = el.offsetTop - container.offsetTop;
+        if (top <= scrollY + 140) {
+          setActiveSection(secId);
+        }
+      }
+    }
+  };
+
+  // 锚点平滑滚动
+  const scrollToSection = (targetId: string) => {
+    if (searchQuery.trim()) {
+      setSearchQuery('');
+    }
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState(null, '', `#${targetId}`);
+      setActiveSection(targetId);
+    }
+    setSidebarOpen(false);
+  };
+
+  // 处理搜索源选择
+  const handleSearchSourceSelect = (source: ExternalSearchSource) => {
+    handleSwitchEngine(source);
     setShowSearchSourcePopup(false);
     setHoveredSearchSource(null);
   };
+
 
   // --- Search Config ---
   const handleSaveSearchConfig = async (sources: ExternalSearchSource[], mode: SearchMode, selectedSource?: ExternalSearchSource | null) => {
@@ -1879,7 +1967,7 @@ function App() {
           isSortingMode || isSortingPinned
             ? 'bg-blue-50/50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' 
             : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
-        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-blue-400/60 dark:hover:border-blue-500/60'} ${
+        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-slate-300/80 dark:hover:border-slate-600/80'} ${
           isDetailedView 
             ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
             : 'flex items-center rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
@@ -1903,9 +1991,7 @@ function App() {
             </div>
             
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className={`text-slate-800 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
-              }`} title={link.title}>
+              <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis" title={link.title}>
                 {link.title}
               </h3>
               {link.emoji && (
@@ -1925,11 +2011,11 @@ function App() {
 
           {/* 第三行：标签展示 */}
           {isDetailedView && link.tags && link.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2.5">
+            <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
               {link.tags.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
                 >
                   #{tag}
                 </span>
@@ -1962,7 +2048,7 @@ function App() {
             : isUnassignedHighlight
               ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-300 dark:border-amber-800/50'
               : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
-        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-blue-400/60 dark:hover:border-blue-500/60'} ${
+        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-slate-300/80 dark:hover:border-slate-600/80'} ${
           isDetailedView 
             ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
             : 'flex items-center justify-between rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
@@ -1988,9 +2074,7 @@ function App() {
               </div>
               
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`text-slate-800 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                  isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
-                }`} title={link.title}>
+                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis" title={link.title}>
                   {link.title}
                 </h3>
                 {link.emoji && (
@@ -2010,11 +2094,11 @@ function App() {
 
             {/* 第三行：标签展示 */}
             {isDetailedView && link.tags && link.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2.5">
+              <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
                 {link.tags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
                   >
                     #{tag}
                   </span>
@@ -2057,9 +2141,7 @@ function App() {
               </div>
               
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`text-slate-800 dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
-                  isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
-                }`} title={link.title}>
+                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
                   {link.title}
                 </h3>
                 {link.emoji && (
@@ -2079,7 +2161,7 @@ function App() {
 
             {/* 第三行：标签展示 */}
             {isDetailedView && link.tags && link.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2.5">
+              <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
                 {link.tags.map((tag, idx) => (
                   <span
                     key={idx}
@@ -2088,7 +2170,7 @@ function App() {
                       e.stopPropagation();
                       setSearchQuery(tag);
                     }}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2265,15 +2347,18 @@ function App() {
         >
             <div className="px-4">
               <button
-                onClick={() => { setSelectedCategory('all'); setSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  selectedCategory === 'all' 
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                onClick={() => scrollToSection('pinned')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
+                  activeSection === 'pinned' && !searchQuery
+                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold shadow-sm' 
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/60'
                 }`}
               >
-                <div className="p-1"><Icon name="LayoutGrid" size={18} /></div>
-                <span>置顶网站</span>
+                <div className={`p-1.5 rounded-lg flex items-center justify-center ${activeSection === 'pinned' && !searchQuery ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                  <Icon name="LayoutGrid" size={16} />
+                </div>
+                <span className="truncate flex-1 text-left text-sm font-medium">热门推荐</span>
+                {activeSection === 'pinned' && !searchQuery && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
               </button>
             </div>
             
@@ -2291,6 +2376,8 @@ function App() {
             {categories.filter(c => !c.parentId).map(cat => {
                 const isLocked = cat.password && !unlockedCategoryIds.has(cat.id);
                 const subCats = categories.filter(c => c.parentId === cat.id);
+                const isActive = (activeSection === `cat-${cat.id}` || subCats.some(sc => activeSection === `cat-${sc.id}`)) && !searchQuery;
+
                 return (
                   <div 
                     key={cat.id} 
@@ -2302,18 +2389,25 @@ function App() {
                     onMouseLeave={() => setHoveredCategory(null)}
                   >
                     <button
-                      onClick={() => handleCategoryClick(cat)}
+                      onClick={() => {
+                        if (isLocked) {
+                          setCatAuthModalData(cat);
+                          setSidebarOpen(false);
+                          return;
+                        }
+                        scrollToSection(`cat-${cat.id}`);
+                      }}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all group ${
-                        selectedCategory === cat.id || (subCats.some(sc => sc.id === selectedCategory))
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium' 
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                        isActive
+                          ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold shadow-sm' 
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/60'
                       }`}
                     >
-                      <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${selectedCategory === cat.id ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                      <div className={`p-1.5 rounded-lg transition-colors flex items-center justify-center ${isActive ? 'bg-blue-100 dark:bg-blue-800' : 'bg-slate-100 dark:bg-slate-800'}`}>
                         {isLocked ? <Lock size={16} className="text-amber-500" /> : <Icon name={cat.icon} size={16} />}
                       </div>
-                      <span className="truncate flex-1 text-left">{cat.name}</span>
-                      {(selectedCategory === cat.id || subCats.some(sc => sc.id === selectedCategory)) && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
+                      <span className="truncate flex-1 text-left text-sm font-medium">{cat.name}</span>
+                      {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
                       {subCats.length > 0 && (
                         <div className="text-slate-400 group-hover:text-blue-500 transition-colors">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -2327,20 +2421,26 @@ function App() {
                           className="fixed left-64 w-[166px] bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-[60] animate-in fade-in slide-in-from-left-2 duration-200 hidden lg:block"
                           style={{ top: hoveredCategoryTop }}
                         >
-                        {/* 增加一个透明的遮罩层，防止鼠标移动到间隙时消失 */}
                         <div className="absolute -left-4 top-0 bottom-0 w-4 bg-transparent" />
-                        
                         <div className="px-4 py-1 mb-1 border-b border-slate-100 dark:border-slate-700">
-                          <span className="font-bold text-slate-400 uppercase tracking-widest" style={{ fontSize: '13px' }}>{cat.name} / 二级分类</span>
+                          <span className="font-bold text-slate-400 uppercase tracking-widest text-xs">{cat.name} / 二级分类</span>
                         </div>
                         {subCats.map(subCat => {
                           const isSubLocked = isCategoryLocked(subCat.id);
+                          const isSubActive = activeSection === `cat-${subCat.id}`;
                           return (
                             <button
                               key={subCat.id}
-                              onClick={() => handleCategoryClick(subCat)}
+                              onClick={() => {
+                                if (isSubLocked) {
+                                  setCatAuthModalData(subCat);
+                                  setSidebarOpen(false);
+                                  return;
+                                }
+                                scrollToSection(`cat-${subCat.id}`);
+                              }}
                               className={`w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-left ${
-                                selectedCategory === subCat.id ? 'text-blue-600 dark:text-blue-400 font-medium' : 'text-slate-600 dark:text-slate-400'
+                                isSubActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-600 dark:text-slate-400'
                               }`}
                             >
                               {isSubLocked ? <Lock size={14} className="text-amber-500" /> : <Icon name={subCat.icon} size={14} />}
@@ -2438,7 +2538,7 @@ function App() {
               {/* 搜索引擎平铺 Tabs (UISDC 风格) */}
               <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-700/70 p-1 rounded-full text-xs shrink-0 border border-slate-200/50 dark:border-slate-600/50">
                 <button
-                  onClick={() => handleSearchModeChange('internal')}
+                  onClick={() => handleSwitchEngine('internal')}
                   className={`px-3 py-1 rounded-full transition-all flex items-center gap-1 ${
                     searchMode === 'internal'
                       ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 font-semibold shadow-sm'
@@ -2450,16 +2550,13 @@ function App() {
                 </button>
                 {externalSearchSources.filter(s => s.enabled).slice(0, 4).map((source) => {
                   const isCurrent = searchMode === 'external' && (
-                    selectedSearchSource?.name === source.name ||
-                    (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.name === source.name)
+                    selectedSearchSource?.id === source.id ||
+                    (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.id === source.id)
                   );
                   return (
                     <button
-                      key={source.name}
-                      onClick={() => {
-                        handleSearchModeChange('external');
-                        handleSearchSourceSelect(source);
-                      }}
+                      key={source.id || source.name}
+                      onClick={() => handleSwitchEngine(source)}
                       className={`px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5 ${
                         isCurrent
                           ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 font-semibold shadow-sm'
@@ -2611,378 +2708,343 @@ function App() {
         </header>
 
         {/* Content Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8">
+        <div ref={contentScrollRef} onScroll={handleContentScroll} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-10 scroll-smooth">
+          
+          {/* 优设导航同款 Hero 大搜索 Banner */}
+          <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 p-6 sm:p-10 shadow-lg text-white">
+            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
             
-            {/* 1. Pinned Area (Custom Top Area) */}
-            {pinnedLinks.length > 0 && !searchQuery && (selectedCategory === 'all') && (
-                <section>
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
-                            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                热门推荐
-                            </h2>
-                            <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
-                                {pinnedLinks.length}
-                            </span>
-                        </div>
-                        {isSortingPinned ? (
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={savePinnedSorting}
-                                    className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
-                                    title="保存顺序"
-                                >
-                                    <Save size={14} />
-                                    <span>保存顺序</span>
-                                </button>
-                                <button 
-                                    onClick={cancelPinnedSorting}
-                                    className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
-                                    title="取消排序"
-                                >
-                                    取消
-                                </button>
-                            </div>
-                        ) : (
-                            <button 
-                                onClick={() => setIsSortingPinned(true)}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
-                                title="排序"
-                            >
-                                <GripVertical size={14} />
-                                <span>排序</span>
-                            </button>
-                        )}
-                    </div>
-                    {isSortingPinned ? (
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCorners}
-                            onDragEnd={handlePinnedDragEnd}
-                        >
-                            <SortableContext
-                                items={pinnedLinks.map(link => link.id)}
-                                strategy={rectSortingStrategy}
-                            >
-                                <div className={`grid gap-3 ${
-                                  siteSettings.cardStyle === 'detailed' 
-                                    ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                                }`}>
-                                    {pinnedLinks.map(link => (
-                                        <SortableLinkCard key={link.id} link={link} />
-                                    ))}
-                                </div>
-                            </SortableContext>
-                        </DndContext>
-                    ) : (
-                        <div className={`grid gap-3 ${
-                          siteSettings.cardStyle === 'detailed' 
-                            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                            : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                        }`}>
-                            {pinnedLinks.map(link => renderLinkCard(link))}
-                        </div>
-                    )}
-                </section>
-            )}
+            <div className="relative z-10 text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-wide drop-shadow-sm">
+                {siteSettings.title ? siteSettings.title.replace(' - 我的导航', '') : '百万用户在用的智能导航'}
+              </h1>
+            </div>
 
-            {/* 2. Main Grid */}
-            {(selectedCategory !== 'all' || searchQuery) && (
-            <section>
-                 {(!pinnedLinks.length && !searchQuery && selectedCategory === 'all') && (
-                    <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg flex items-center justify-between">
-                         <div>
-                            <h1 className="text-xl font-bold">早安 👋</h1>
-                            <p className="text-sm opacity-90 mt-1">
-                                {links.length} 个链接 · {categories.length} 个分类
-                            </p>
-                         </div>
-                         <Icon name="Compass" size={48} className="opacity-20" />
-                    </div>
-                 )}
+            <div className="relative z-10 max-w-2xl mx-auto">
+              {/* 连体选项卡 */}
+              <div className="flex items-end gap-1 pl-3">
+                <button
+                  onClick={() => handleSwitchEngine('internal')}
+                  className={`px-4 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all ${
+                    searchMode === 'internal'
+                      ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm -mb-[1px] z-10'
+                      : 'text-white/80 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  常用
+                </button>
+                {externalSearchSources.filter(s => s.enabled).slice(0, 5).map(source => {
+                  const isCur = searchMode === 'external' && (
+                    selectedSearchSource?.id === source.id ||
+                    (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.id === source.id)
+                  );
+                  return (
+                    <button
+                      key={source.id}
+                      onClick={() => handleSwitchEngine(source)}
+                      className={`px-4 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all ${
+                        isCur
+                          ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm -mb-[1px] z-10'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {source.name}
+                    </button>
+                  );
+                })}
+              </div>
 
-                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                     <div className="flex items-center flex-wrap gap-y-2">
-                         <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0 mr-2.5"></div>
-                         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mr-4">
-                             {selectedCategory === 'all' 
-                                ? (searchQuery ? '搜索结果' : '所有链接') 
-                                : (() => {
-                                    const currentCat = categories.find(c => c.id === selectedCategory);
-                                    const primaryCat = currentCat?.parentId 
-                                      ? categories.find(c => c.id === currentCat.parentId) 
-                                      : currentCat;
-                                    
-                                    if (!primaryCat) return '未知分类';
+              {/* 搜索框与橙色大按钮 */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl rounded-tl-none shadow-xl flex items-center p-1.5 border border-white/20">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleTriggerSearch();
+                    }
+                  }}
+                  placeholder={
+                    searchMode === 'internal'
+                      ? '搜索站内书签、标签或表情...'
+                      : `在 ${selectedSearchSource?.name || '站外'} 搜索内容...`
+                  }
+                  className="flex-1 px-4 py-2.5 sm:py-3 bg-transparent text-slate-800 dark:text-white placeholder-slate-400 text-sm sm:text-base outline-none"
+                />
+                {searchQuery.trim() && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 mr-2 transition-colors shrink-0"
+                    title="清空"
+                  >
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+                )}
+                <button
+                  onClick={handleTriggerSearch}
+                  className="bg-[#ff5c00] hover:bg-[#e05200] active:scale-95 text-white font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-lg transition-all shadow-md hover:shadow-orange-500/30 flex items-center gap-1.5 shrink-0 text-sm sm:text-base cursor-pointer"
+                >
+                  <span>{submitButtonText}</span>
+                </button>
+              </div>
 
-                                    const subCats = categories.filter(c => c.parentId === primaryCat.id);
-                                    
-                                    return (
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2">
-                                          <Icon name={primaryCat.icon} size={20} className="text-blue-500" />
-                                          <button 
-                                            onClick={() => handleCategoryClick(primaryCat)}
-                                            className={`hover:text-blue-600 transition-colors ${selectedCategory === primaryCat.id ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 font-medium'}`}
-                                          >
-                                            {primaryCat.name}
-                                          </button>
-                                          {isCategoryLocked(primaryCat.id) && <Lock size={14} className="text-amber-500" />}
-                                        </div>
+              {/* 热门标签微胶囊 */}
+              {topHotTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mt-3.5 px-1">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-400 text-slate-900 shadow-sm">
+                    <Flame size={12} className="fill-current text-red-600" />
+                    热搜榜
+                  </span>
+                  {topHotTags.slice(0, 8).map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        setSearchMode('internal');
+                        setSearchQuery(tag);
+                      }}
+                      className="px-2 py-0.5 rounded text-[11px] font-medium text-white/90 bg-white/15 hover:bg-white/25 hover:text-white transition-all backdrop-blur-sm cursor-pointer"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-                                        {subCats.length > 0 && (
-                                          <>
-                                            <div className="h-4 w-[1px] bg-slate-300 dark:bg-slate-600 mx-1" />
-                                            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-1">
-                                              {subCats.map(sub => (
-                                                <button
-                                                  key={sub.id}
-                                                  onClick={() => handleCategoryClick(sub)}
-                                                  className={`text-sm whitespace-nowrap transition-all relative py-1 ${
-                                                    selectedCategory === sub.id 
-                                                      ? 'text-blue-600 dark:text-blue-400 font-bold' 
-                                                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-medium'
-                                                  }`}
-                                                >
-                                                  <div className="flex items-center gap-1">
-                                                    {sub.name}
-                                                    {isCategoryLocked(sub.id) && <Lock size={12} className="text-amber-500" />}
-                                                  </div>
-                                                  {selectedCategory === sub.id && (
-                                                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500 rounded-full animate-in fade-in zoom-in duration-300" />
-                                                  )}
-                                                </button>
-                                              ))}
-                                            </div>
-                                          </>
-                                        )}
-                                      </div>
-                                    );
-                                  })()
-                             }
-                         </h2>
-                         {selectedCategory !== 'all' && (
-                           <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
-                             {displayedLinks.length}
-                           </span>
-                         )}
-                     </div>
-                     {selectedCategory !== 'all' && !isCategoryLocked(selectedCategory) && (
-                         isSortingMode === selectedCategory ? (
-                             <div className="flex gap-2">
-                                 <button 
-                                     onClick={saveSorting}
-                                     className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
-                                     title="保存顺序"
-                                 >
-                                     <Save size={14} />
-                                     <span>保存顺序</span>
-                                 </button>
-                                 <button 
-                                     onClick={cancelSorting}
-                                     className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
-                                     title="取消排序"
-                                 >
-                                     取消
-                                 </button>
-                             </div>
-                         ) : (
-                             <div className="flex gap-2">
-                                 <button 
-                                     onClick={toggleBatchEditMode}
-                                     className={`flex items-center gap-1 px-3 py-1.5 text-white text-xs font-medium rounded-full transition-colors ${
-                                         isBatchEditMode 
-                                             ? 'bg-red-600 hover:bg-red-700' 
-                                             : 'bg-blue-600 hover:bg-blue-700'
-                                     }`}
-                                     title={isBatchEditMode ? "退出批量编辑" : "批量编辑"}
-                                 >
-                                     {isBatchEditMode ? '取消' : '批量编辑'}
-                                 </button>
-                                 {isBatchEditMode ? (
-                                     <>
-                                         <button 
-                                             onClick={handleBatchDelete}
-                                             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-full transition-colors"
-                                             title="批量删除"
-                                         >
-                                             <Trash2 size={14} />
-                                             <span>批量删除</span>
-                                         </button>
-                                         <button 
-                                             onClick={handleSelectAll}
-                                             className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
-                                             title="全选/取消全选"
-                                         >
-                                             <CheckSquare size={14} />
-                                             <span>{selectedLinks.size === displayedLinks.length ? '取消全选' : '全选'}</span>
-                                         </button>
-                                         <div className="relative group">
-                                              <button 
-                                                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
-                                                  title="批量移动"
-                                              >
-                                                  <Upload size={14} />
-                                                  <span>批量移动</span>
-                                              </button>
-                                              <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden max-h-[500px] overflow-y-auto no-scrollbar">
-                                                  {(() => {
-                                                    const flattened = [];
-                                                    const parents = categories.filter(c => !c.parentId);
-                                                    
-                                                    for (const parent of parents) {
-                                                      if (parent.id !== selectedCategory) {
-                                                        flattened.push({
-                                                          id: parent.id,
-                                                          displayName: parent.name
-                                                        });
-                                                      }
-                                                      
-                                                      const children = categories.filter(c => c.parentId === parent.id);
-                                                      for (const child of children) {
-                                                        if (child.id !== selectedCategory) {
-                                                          flattened.push({
-                                                            id: child.id,
-                                                            displayName: `${parent.name} / ${child.name}`
-                                                          });
-                                                        }
-                                                      }
-                                                    }
-                                                    
-                                                    return flattened.map(cat => (
-                                                      <button
-                                                          key={cat.id}
-                                                          onClick={() => handleBatchMove(cat.id)}
-                                                          className="w-full text-left px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-b border-slate-100 dark:border-slate-700 last:border-0 transition-colors"
-                                                      >
-                                                          {cat.displayName}
-                                                      </button>
-                                                    ));
-                                                  })()}
-                                              </div>
-                                          </div>
-                                     </>
-                                 ) : (
-                                     <button 
-                                         onClick={() => startSorting(selectedCategory)}
-                                         className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-full transition-colors"
-                                         title="排序"
-                                     >
-                                         <GripVertical size={14} />
-                                         <span>排序</span>
-                                     </button>
-                                 )}
-                             </div>
-                         )
-                     )}
-                 </div>
-
-                 {displayedLinks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                        {isCategoryLocked(selectedCategory) ? (
-                            <>
-                                <Lock size={40} className="text-amber-400 mb-4" />
-                                <p>该目录已锁定</p>
-                                <button onClick={() => setCatAuthModalData(categories.find(c => c.id === selectedCategory) || null)} className="mt-4 px-4 py-2 bg-amber-500 text-white rounded-lg">输入密码解锁</button>
-                            </>
-                        ) : (
-                            <>
-                                <Search size={40} className="opacity-30 mb-4" />
-                                <p>没有找到相关内容</p>
-                                {selectedCategory !== 'all' && (
-                                    <button onClick={() => setIsModalOpen(true)} className="mt-4 text-blue-500 hover:underline">添加一个?</button>
-                                )}
-                            </>
-                        )}
-                    </div>
-                 ) : (
-                    isSortingMode === selectedCategory ? (
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCorners}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <SortableContext
-                                items={displayedLinks.map(link => link.id)}
-                                strategy={rectSortingStrategy}
-                            >
-                                <div className={`grid gap-3 ${
-                                  siteSettings.cardStyle === 'detailed' 
-                                    ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                                }`}>
-                                    {displayedLinks.map(link => (
-                                        <SortableLinkCard key={link.id} link={link} />
-                                    ))}
-                                </div>
-                            </SortableContext>
-                        </DndContext>
-                    ) : (
-                        <div className={`grid gap-3 ${
-                          siteSettings.cardStyle === 'detailed' 
-                            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                            : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                        }`}>
-                            {displayedLinks.map(link => renderLinkCard(link))}
-                        </div>
-                    )
-                 )}
-            </section>
-            )}
-
-            {/* 其他目录搜索结果区域 */}
-            {searchQuery.trim() && selectedCategory !== 'all' && (
-              <section className="mt-8 pt-8 border-t-2 border-slate-200 dark:border-slate-700">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-1.5 h-4 bg-gradient-to-b from-purple-500 to-indigo-600 rounded-full shrink-0"></div>
+          {/* 搜索视图：当用户输入搜索词时展示全局匹配结果 */}
+          {searchQuery.trim() ? (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    其他目录搜索结果
+                    搜索结果
                   </h2>
-                  <span className="px-2 py-0.5 text-xs font-semibold bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-full border border-purple-100 dark:border-purple-800/40">
-                    {Object.values(otherCategoryResults).flat().length}
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
+                    {displayedLinks.length}
                   </span>
                 </div>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  清空搜索
+                </button>
+              </div>
 
-                {Object.keys(otherCategoryResults).length > 0 ? (
-                  Object.entries(otherCategoryResults).map(([categoryId, links]) => {
-                    const category = categories.find(c => c.id === categoryId);
-                    if (!category) return null;
-
-                    return (
-                      <div key={categoryId} className="mb-6 last:mb-0">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="w-1 h-3 bg-slate-300 dark:bg-slate-600 rounded-full shrink-0"></div>
-                          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                            {category.name}
-                          </h3>
-                          <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full">
-                            {links.length}
-                          </span>
-                        </div>
-
+              {displayedLinks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                  <Search size={40} className="opacity-30 mb-4" />
+                  <p className="text-sm">没有找到相关内容</p>
+                </div>
+              ) : (
+                <div className={`grid gap-3 ${
+                  siteSettings.cardStyle === 'detailed' 
+                    ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
+                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
+                }`}>
+                  {displayedLinks.map(link => renderLinkCard(link))}
+                </div>
+              )}
+            </section>
+          ) : (
+            <>
+              {/* 热门推荐 / 置顶专区 (#pinned) */}
+              {pinnedLinks.length > 0 && (
+                <section id="pinned" className="scroll-mt-6 space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
+                      <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        热门推荐
+                      </h2>
+                      <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
+                        {pinnedLinks.length}
+                      </span>
+                    </div>
+                    {isSortingPinned ? (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={savePinnedSorting}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                          title="保存顺序"
+                        >
+                          <Save size={14} />
+                          <span>保存顺序</span>
+                        </button>
+                        <button 
+                          onClick={cancelPinnedSorting}
+                          className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                          title="取消排序"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : authToken ? (
+                      <button 
+                        onClick={() => setIsSortingPinned(true)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-xs font-medium transition-colors"
+                        title="排序"
+                      >
+                        <GripVertical size={13} />
+                        <span>排序</span>
+                      </button>
+                    ) : null}
+                  </div>
+                  {isSortingPinned ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCorners}
+                      onDragEnd={handlePinnedDragEnd}
+                    >
+                      <SortableContext
+                        items={pinnedLinks.map(link => link.id)}
+                        strategy={rectSortingStrategy}
+                      >
                         <div className={`grid gap-3 ${
                           siteSettings.cardStyle === 'detailed' 
                             ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                             : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
                         }`}>
-                          {links.map(link => renderLinkCard(link))}
+                          {pinnedLinks.map(link => (
+                            <SortableLinkCard key={link.id} link={link} />
+                          ))}
                         </div>
+                      </SortableContext>
+                    </DndContext>
+                  ) : (
+                    <div className={`grid gap-3 ${
+                      siteSettings.cardStyle === 'detailed' 
+                        ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
+                        : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
+                    }`}>
+                      {pinnedLinks.map(link => renderLinkCard(link))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* 全景分类流：所有分类依次纵向排列展示 */}
+              {categories.filter(c => !c.parentId).map(cat => {
+                const subCats = categories.filter(c => c.parentId === cat.id);
+                const subCatIds = subCats.map(c => c.id);
+                const isLocked = isCategoryLocked(cat.id);
+                const catLinks = links.filter(l => l.categoryId === cat.id || subCatIds.includes(l.categoryId));
+
+                return (
+                  <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-6 space-y-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center flex-wrap gap-2.5">
+                        <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
+                        <div className="flex items-center gap-2">
+                          <Icon name={cat.icon} size={18} className="text-blue-500 shrink-0" />
+                          <h2 className="text-[17px] font-bold text-slate-800 dark:text-slate-100">
+                            {cat.name}
+                          </h2>
+                          {isLocked && <Lock size={14} className="text-amber-500" />}
+                        </div>
+                        <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
+                          {catLinks.length}
+                        </span>
+
+                        {/* 二级分类快速定位 */}
+                        {subCats.length > 0 && (
+                          <div className="flex items-center gap-2 ml-2 overflow-x-auto no-scrollbar py-0.5">
+                            {subCats.map(sub => (
+                              <button
+                                key={sub.id}
+                                onClick={() => scrollToSection(`cat-${sub.id}`)}
+                                className="text-xs px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-all shadow-sm"
+                              >
+                                {sub.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-30 mb-4">
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <path d="m21 21-4.35-4.35"></path>
-                    </svg>
-                    <p className="text-sm">其他目录中没有找到相关内容</p>
-                  </div>
-                )}
-              </section>
-            )}
+
+                      {/* 排序按钮 */}
+                      {authToken && !isLocked && (
+                        <div className="flex items-center gap-2">
+                          {isSortingMode === cat.id ? (
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={saveSorting}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
+                                title="保存顺序"
+                              >
+                                <Save size={14} />
+                                <span>保存顺序</span>
+                              </button>
+                              <button 
+                                onClick={cancelSorting}
+                                className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium rounded-full hover:bg-slate-300 dark:hover:bg-slate-600 transition-all"
+                                title="取消排序"
+                              >
+                                取消
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => startSorting(cat.id)}
+                              className="flex items-center gap-1 px-2.5 py-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-xs font-medium transition-colors"
+                              title="排序"
+                            >
+                              <GripVertical size={13} />
+                              <span>排序</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {isLocked ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                        <Lock size={32} className="text-amber-400 mb-2" />
+                        <p className="text-sm">该目录已加锁锁定</p>
+                        <button onClick={() => setCatAuthModalData(cat)} className="mt-3 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium">输入密码解锁</button>
+                      </div>
+                    ) : catLinks.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-700/60 rounded-xl text-xs">
+                        暂无链接
+                      </div>
+                    ) : isSortingMode === cat.id ? (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCorners}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext
+                          items={catLinks.map(link => link.id)}
+                          strategy={rectSortingStrategy}
+                        >
+                          <div className={`grid gap-3 ${
+                            siteSettings.cardStyle === 'detailed' 
+                              ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
+                              : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
+                          }`}>
+                            {catLinks.map(link => (
+                              <SortableLinkCard key={link.id} link={link} />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    ) : (
+                      <div className={`grid gap-3 ${
+                        siteSettings.cardStyle === 'detailed' 
+                          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
+                          : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
+                      }`}>
+                        {catLinks.map(link => renderLinkCard(link))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </>
+          )}
         </div>
       </main>
 
