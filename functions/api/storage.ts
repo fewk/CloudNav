@@ -101,9 +101,9 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
       // 检查密码是否过期
       const websiteConfigStr = await env.CLOUDNAV_KV.get('website_config');
       const websiteConfig = websiteConfigStr ? JSON.parse(websiteConfigStr) : { passwordExpiryDays: 7 };
-      const passwordExpiryDays = websiteConfig.passwordExpiryDays || 7;
+      const passwordExpiryDays = websiteConfig.passwordExpiryDays !== undefined ? websiteConfig.passwordExpiryDays : 7;
       
-      // 如果设置了密码过期时间，检查是否过期
+      // 如果设置了密码过期时间且大于0，检查是否过期
       if (passwordExpiryDays > 0) {
         const lastAuthTime = await env.CLOUDNAV_KV.get('last_auth_time');
         if (lastAuthTime) {

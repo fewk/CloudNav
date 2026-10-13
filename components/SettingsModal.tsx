@@ -102,7 +102,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           title: siteSettings?.title || 'CloudNav - 我的导航',
           navTitle: siteSettings?.navTitle || 'CloudNav',
           favicon: siteSettings?.favicon || '',
-          cardStyle: siteSettings?.cardStyle || 'detailed'
+          cardStyle: siteSettings?.cardStyle || 'detailed',
+          passwordExpiryDays: siteSettings?.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -161,6 +162,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = () => {
     onSave(localConfig, localSiteSettings);
+    saveWebsiteConfigToKV(localSiteSettings);
     onClose();
   };
 
@@ -1115,18 +1117,42 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     </div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">身份验证过期天数</label>
-                                <div className="relative">
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    身份验证有效期
+                                </label>
+                                <div className="flex items-center gap-2">
                                     <input 
-                                        type="number" 
-                                        min="0"
-                                        value={localSiteSettings.passwordExpiryDays}
-                                        onChange={(e) => handleSiteChange('passwordExpiryDays', parseInt(e.target.value) || 0)}
-                                        className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                        type="checkbox" 
+                                        id="neverExpireCheckbox"
+                                        checked={localSiteSettings.passwordExpiryDays === 0}
+                                        onChange={(e) => {
+                                            const isNever = e.target.checked;
+                                            handleSiteChange('passwordExpiryDays', isNever ? 0 : 7);
+                                        }}
+                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer"
                                     />
+                                    <label htmlFor="neverExpireCheckbox" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                        永不退出（直至修改密码）
+                                    </label>
                                 </div>
-                                <p className="text-xs text-slate-500 mt-1">设置为 0 表示永久不退出，默认 7 天后自动退出</p>
+                                {localSiteSettings.passwordExpiryDays !== 0 && (
+                                    <div className="pt-1">
+                                        <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">自动退出天数（默认 7 天）</label>
+                                        <input 
+                                            type="number" 
+                                            min="1"
+                                            value={localSiteSettings.passwordExpiryDays || 7}
+                                            onChange={(e) => handleSiteChange('passwordExpiryDays', Math.max(1, parseInt(e.target.value) || 7))}
+                                            className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                    {localSiteSettings.passwordExpiryDays === 0 
+                                        ? '已勾选永不退出：只要 Cloudflare 后台未修改密码，将永久保持登录状态' 
+                                        : `默认 7 天：未操作 ${localSiteSettings.passwordExpiryDays || 7} 天后需重新验证密码`}
+                                </p>
                             </div>
                         </div>
                     </div>

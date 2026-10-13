@@ -479,7 +479,7 @@ function App() {
         const lastLogin = parseInt(lastLoginTime);
         const timeDiff = currentTime - lastLogin;
         
-        const expiryDays = siteSettings.passwordExpiryDays || 7;
+        const expiryDays = siteSettings.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7;
         const expiryTimeMs = expiryDays > 0 ? expiryDays * 24 * 60 * 60 * 1000 : 0;
         
         if (expiryTimeMs > 0 && timeDiff > expiryTimeMs) {
@@ -542,8 +542,9 @@ function App() {
         // 获取数据
         let hasCloudData = false;
         try {
+            const tokenToUse = authToken || localStorage.getItem(AUTH_KEY) || savedToken;
             const res = await fetch('/api/storage', {
-                headers: authToken ? { 'x-auth-password': authToken } : {}
+                headers: tokenToUse ? { 'x-auth-password': tokenToUse } : {}
             });
             if (res.ok) {
                 const data = await res.json();
@@ -557,15 +558,13 @@ function App() {
                     hasCloudData = true;
                 }
             } else if (res.status === 401) {
-                // 如果返回401，可能是密码过期，清除本地token并要求重新登录
-                const errorData = await res.json();
-                if (errorData.error && errorData.error.includes('过期')) {
-                    setAuthToken(null);
-                    localStorage.removeItem(AUTH_KEY);
-                    setIsAuthOpen(true);
-                    setIsCheckingAuth(false);
-                    return;
-                }
+                // 如果返回401（密码被修改或密码过期），清除本地旧token并弹出登录框
+                setAuthToken('');
+                localStorage.removeItem(AUTH_KEY);
+                localStorage.removeItem('lastLoginTime');
+                setIsAuthOpen(true);
+                setIsCheckingAuth(false);
+                return;
             }
         } catch (e) {
             console.warn("Failed to fetch from cloud, falling back to local.", e);
@@ -856,10 +855,11 @@ function App() {
                 const lastLogin = parseInt(lastLoginTime);
                 const timeDiff = currentTime - lastLogin;
                 
-                const expiryTimeMs = (siteSettings.passwordExpiryDays || 7) > 0 ? (siteSettings.passwordExpiryDays || 7) * 24 * 60 * 60 * 1000 : 0;
+                const expiryDays = siteSettings.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7;
+                const expiryTimeMs = expiryDays > 0 ? expiryDays * 24 * 60 * 60 * 1000 : 0;
                 
                 if (expiryTimeMs > 0 && timeDiff > expiryTimeMs) {
-                    setAuthToken(null);
+                    setAuthToken('');
                     localStorage.removeItem(AUTH_KEY);
                     setIsAuthOpen(true);
                     alert('您的密码已过期，请重新登录');
@@ -871,7 +871,9 @@ function App() {
             
             // 登录成功后，从服务器获取数据
             try {
-                const res = await fetch('/api/storage');
+                const res = await fetch('/api/storage', {
+                    headers: { 'x-auth-password': password }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     // 如果服务器有数据，使用服务器数据
