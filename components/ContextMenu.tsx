@@ -10,6 +10,8 @@ interface ContextMenuProps {
   onEditLink: () => void;
   onDeleteLink: () => void;
   onTogglePin: () => void;
+  currentEmoji?: string;
+  onSetEmoji?: (emoji: string) => void;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -20,7 +22,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onShowQRCode,
   onEditLink,
   onDeleteLink,
-  onTogglePin
+  onTogglePin,
+  currentEmoji,
+  onSetEmoji
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +81,41 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
         top: adjustedPosition.y
       }}
     >
+      {/* 快捷表情标记 */}
+      {onSetEmoji && (
+        <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/60">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5 select-none">
+            <span>快捷标记</span>
+            {currentEmoji && <span className="font-medium text-blue-500">当前: {currentEmoji}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            {[
+              { label: '无', val: '' },
+              { label: '⭐', val: '⭐' },
+              { label: '🔥', val: '🔥' },
+              { label: '❤️', val: '❤️' }
+            ].map((item) => (
+              <button
+                key={item.label}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSetEmoji(item.val);
+                  onClose();
+                }}
+                className={`flex-1 py-1 text-xs rounded transition-all text-center ${
+                  (currentEmoji || '') === item.val
+                    ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-bold'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+                title={item.val ? `标记为 ${item.val}` : '清除标记'}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {menuItems.map((item, index) => (
         <button
           key={index}

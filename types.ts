@@ -8,6 +8,7 @@ export interface LinkItem {
   createdAt: number;
   pinned?: boolean; // New field for pinning
   pinnedOrder?: number; // Field for pinned link sorting order
+  emoji?: string; // 自主表情符号，如 ⭐、🔥、❤️ 或自定义
 }
 
 export interface Category {

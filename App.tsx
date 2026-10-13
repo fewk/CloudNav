@@ -376,6 +376,25 @@ function App() {
     closeContextMenu();
   };
 
+  const setEmojiFromContextMenu = (emoji: string) => {
+    if (!contextMenu.link) return;
+    if (!authToken) { setIsAuthOpen(true); return; }
+    
+    const targetId = contextMenu.link.id;
+    const updated = links.map(l => {
+      if (l.id === targetId) {
+        return {
+          ...l,
+          emoji: emoji || undefined
+        };
+      }
+      return l;
+    });
+    
+    updateData(updated, categories);
+    closeContextMenu();
+  };
+
   // 加载链接图标缓存
   const loadLinkIcons = async (linksToLoad: LinkItem[]) => {
     if (!authToken) return; // 只有在已登录状态下才加载图标缓存
@@ -1754,7 +1773,8 @@ function App() {
       result = result.filter(l => 
         l.title.toLowerCase().includes(q) || 
         l.url.toLowerCase().includes(q) ||
-        (l.description && l.description.toLowerCase().includes(q))
+        (l.description && l.description.toLowerCase().includes(q)) ||
+        (l.emoji && l.emoji.toLowerCase().includes(q))
       );
     }
 
@@ -1800,7 +1820,8 @@ function App() {
       return (
         link.title.toLowerCase().includes(q) || 
         link.url.toLowerCase().includes(q) ||
-        (link.description && link.description.toLowerCase().includes(q))
+        (link.description && link.description.toLowerCase().includes(q)) ||
+        (link.emoji && link.emoji.toLowerCase().includes(q))
       );
     });
 
@@ -1881,11 +1902,18 @@ function App() {
             </div>
             
             {/* 标题 */}
-            <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-              isDetailedView ? 'text-base' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
-            }`} title={link.title}>
-                {link.title}
-            </h3>
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+              }`} title={link.title}>
+                  {link.title}
+              </h3>
+              {link.emoji && (
+                <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
+                  {link.emoji}
+                </span>
+              )}
+            </div>
           </div>
           
           {/* 第二行：描述文字 */}
@@ -1943,11 +1971,18 @@ function App() {
               </div>
               
               {/* 标题 */}
-              <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-base' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
-              }`} title={link.title}>
-                  {link.title}
-              </h3>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                  isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+                }`} title={link.title}>
+                    {link.title}
+                </h3>
+                {link.emoji && (
+                  <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
+                    {link.emoji}
+                  </span>
+                )}
+              </div>
             </div>
             
             {/* 第二行：描述文字 */}
@@ -1977,11 +2012,18 @@ function App() {
               </div>
               
               {/* 标题 */}
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
                 <h3 className={`text-slate-800 dark:text-slate-200 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
-                  isDetailedView ? 'text-base' : 'text-sm font-medium'
+                  isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium'
                 }`} title={link.title}>
                     {link.title}
                 </h3>
+                {link.emoji && (
+                  <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
+                    {link.emoji}
+                  </span>
+                )}
+              </div>
             </div>
             
             {/* 第二行：描述文字 */}
@@ -2920,6 +2962,8 @@ function App() {
             onEditLink={editLinkFromContextMenu}
             onDeleteLink={deleteLinkFromContextMenu}
             onTogglePin={togglePinFromContextMenu}
+            currentEmoji={contextMenu.link?.emoji}
+            onSetEmoji={setEmojiFromContextMenu}
           />
 
           {/* 二维码模态框 */}

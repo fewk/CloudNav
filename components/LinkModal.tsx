@@ -21,6 +21,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'common');
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
+  const [emoji, setEmoji] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFetchingIcon, setIsFetchingIcon] = useState(false);
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
@@ -54,6 +55,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setCategoryId(initialData.categoryId);
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
+        setEmoji(initialData.emoji || '');
       } else {
         setTitle('');
         setUrl('');
@@ -63,6 +65,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setCategoryId(defaultCategory ? defaultCategoryId : (categories[0]?.id || 'common'));
         setPinned(false);
         setIcon('');
+        setEmoji('');
       }
     }
   }, [isOpen, initialData, categories, defaultCategoryId]);
@@ -135,7 +138,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       icon,
       description,
       categoryId,
-      pinned
+      pinned,
+      emoji: emoji.trim() || undefined
     });
     
     // 如果有自定义图标URL，缓存到KV空间
@@ -152,6 +156,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       setIcon('');
       setDescription('');
       setPinned(false);
+      setEmoji('');
       // 如果开启自动获取图标，尝试获取新图标
       if (autoFetchIcon && finalUrl) {
         handleFetchIcon();
@@ -318,6 +323,52 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
               className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               placeholder="网站名称"
             />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium dark:text-slate-300">表情符号 / 标记 (选填)</label>
+              {emoji && (
+                <button
+                  type="button"
+                  onClick={() => setEmoji('')}
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  清除标记
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/60 p-1 rounded-lg shrink-0">
+                {[
+                  { label: '无', val: '' },
+                  { label: '⭐', val: '⭐' },
+                  { label: '🔥', val: '🔥' },
+                  { label: '❤️', val: '❤️' }
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => setEmoji(item.val)}
+                    className={`px-2.5 py-1 text-sm rounded-md transition-all ${
+                      emoji === item.val
+                        ? 'bg-white dark:bg-slate-600 shadow-sm font-bold text-blue-600 dark:text-blue-400'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-slate-600/50'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                maxLength={6}
+                value={emoji}
+                onChange={(e) => setEmoji(e.target.value)}
+                className="flex-1 p-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all text-center placeholder:text-xs"
+                placeholder="或自定义输入 (如 🚀 / 💡)"
+              />
+            </div>
           </div>
 
           <div>
