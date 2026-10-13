@@ -1774,7 +1774,8 @@ function App() {
         l.title.toLowerCase().includes(q) || 
         l.url.toLowerCase().includes(q) ||
         (l.description && l.description.toLowerCase().includes(q)) ||
-        (l.emoji && l.emoji.toLowerCase().includes(q))
+        (l.emoji && l.emoji.toLowerCase().includes(q)) ||
+        (l.tags && l.tags.some(tag => tag.toLowerCase().includes(q)))
       );
     }
 
@@ -1821,7 +1822,8 @@ function App() {
         link.title.toLowerCase().includes(q) || 
         link.url.toLowerCase().includes(q) ||
         (link.description && link.description.toLowerCase().includes(q)) ||
-        (link.emoji && link.emoji.toLowerCase().includes(q))
+        (link.emoji && link.emoji.toLowerCase().includes(q)) ||
+        (link.tags && link.tags.some(tag => tag.toLowerCase().includes(q)))
       );
     });
 
@@ -1922,6 +1924,20 @@ function App() {
                  {link.description}
                </p>
              )}
+
+          {/* 第三行：标签展示 */}
+          {isDetailedView && link.tags && link.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {link.tags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1991,6 +2007,32 @@ function App() {
                 {link.description}
               </p>
             )}
+
+            {/* 第三行：标签展示 */}
+            {isDetailedView && link.tags && link.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {link.tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!isDetailedView && link.tags && link.tags.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-2">
+                {link.tags.slice(0, 2).map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <a
@@ -2032,6 +2074,44 @@ function App() {
                   {link.description}
                 </p>
               )}
+
+            {/* 第三行：标签展示 */}
+            {isDetailedView && link.tags && link.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {link.tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSearchQuery(tag);
+                    }}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    title={`按标签 #${tag} 筛选`}
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!isDetailedView && link.tags && link.tags.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-7">
+                {link.tags.slice(0, 2).map((tag, idx) => (
+                  <span
+                    key={idx}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSearchQuery(tag);
+                    }}
+                    className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    title={`按标签 #${tag} 筛选`}
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
             {!isDetailedView && link.description && (
               <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[200px] bg-black text-white text-xs p-2 rounded opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate">
                 {link.description}

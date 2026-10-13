@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2, Pin, Wand2, Trash2 } from 'lucide-react';
+import { X, Sparkles, Loader2, Pin, Wand2, Trash2, Tag, Plus } from 'lucide-react';
 import { LinkItem, Category, AIConfig } from '../types';
-import { generateLinkDescription, suggestCategory } from '../services/geminiService';
+import { analyzeLinkWithAI, generateLinkDescription, suggestCategory, WebScrapeMetadata } from '../services/geminiService';
 
 interface LinkModalProps {
   isOpen: boolean;
@@ -22,6 +22,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   const [pinned, setPinned] = useState(false);
   const [icon, setIcon] = useState('');
   const [emoji, setEmoji] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isFetchingIcon, setIsFetchingIcon] = useState(false);
   const [autoFetchIcon, setAutoFetchIcon] = useState(true);
@@ -56,6 +59,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setPinned(initialData.pinned || false);
         setIcon(initialData.icon || '');
         setEmoji(initialData.emoji || '');
+        setTags(initialData.tags || []);
+        setTagInput('');
+        setSuggestedTags([]);
       } else {
         setTitle('');
         setUrl('');
@@ -66,6 +72,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
         setPinned(false);
         setIcon('');
         setEmoji('');
+        setTags([]);
+        setTagInput('');
+        setSuggestedTags([]);
       }
     }
   }, [isOpen, initialData, categories, defaultCategoryId]);
@@ -119,15 +128,36 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
     }
   };
 
+  const handleAddTag = (newTag?: string) => {
+    const t = (newTag !== undefined ? newTag : tagInput).trim();
+    if (!t) return;
+    if (!tags.includes(t)) {
+      setTags(prev => [...prev, t]);
+    }
+    setSuggestedTags(prev => prev.filter(st => st !== t));
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(prev => prev.filter(t => t !== tagToRemove));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title || !url) return;
     
     // 确保URL有协议前缀
-    let finalUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      finalUrl = 'https://' + url;
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
     }
     
     // 保存链接数据
@@ -139,7 +169,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       description,
       categoryId,
       pinned,
-      emoji: emoji.trim() || undefined
+      emoji: emoji.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined
     });
     
     // 如果有自定义图标URL，缓存到KV空间
@@ -157,6 +188,9 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
       setDescription('');
       setPinned(false);
       setEmoji('');
+      setTags([]);
+      setTagInput('');
+      setSuggestedTags([]);
       // 如果开启自动获取图标，尝试获取新图标
       if (autoFetchIcon && finalUrl) {
         handleFetchIcon();
@@ -167,28 +201,92 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
   };
 
   const handleAIAssist = async () => {
-    if (!url || !title) return;
-    if (!aiConfig.apiKey) {
-        alert("请先点击侧边栏左下角设置图标配置 AI API Key");
-        return;
+    if (!url) {
+      alert("请先输入 URL 链接");
+      return;
     }
 
     setIsGenerating(true);
-    
-    // Parallel execution for speed
+    let targetUrl = url.trim();
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+      setUrl(targetUrl);
+    }
+
     try {
-        const descPromise = generateLinkDescription(title, url, aiConfig);
-        const catPromise = suggestCategory(title, url, categories, aiConfig);
-        
-        const [desc, cat] = await Promise.all([descPromise, catPromise]);
-        
-        if (desc) setDescription(desc);
-        if (cat) setCategoryId(cat);
-        
+      // 1. 服务端无 CORS 边缘网页抓取
+      const authToken = localStorage.getItem('authToken');
+      let scrapeData: WebScrapeMetadata | null = null;
+      try {
+        const res = await fetch(`/api/scrape?url=${encodeURIComponent(targetUrl)}`, {
+          headers: authToken ? { 'x-auth-password': authToken } : {}
+        });
+        if (res.ok) {
+          scrapeData = await res.json();
+        }
+      } catch (err) {
+        console.warn("Scrape endpoint call failed", err);
+      }
+
+      // 如果抓取到了网页图标，且当前没有图标或为默认图标，自动填入并缓存
+      if (scrapeData?.icon && (!icon || icon.includes('gstatic.cn'))) {
+        setIcon(scrapeData.icon);
+        cacheCustomIcon(targetUrl, scrapeData.icon);
+      } else if (!icon) {
+        handleFetchIcon();
+      }
+
+      // 如果当前没有标题，填入抓取到的网页原始标题
+      if (!title && scrapeData?.title) {
+        setTitle(scrapeData.title);
+      }
+
+      // 2. 如果配置了 AI Key，则执行 AI 深度分析（精炼标题、精简描述、推荐分类、提取标签）
+      if (aiConfig.apiKey) {
+        let domain = '';
+        try {
+          domain = new URL(targetUrl).hostname;
+        } catch (e) {
+          domain = targetUrl;
+        }
+
+        const metadataToAnalyze: WebScrapeMetadata = scrapeData || {
+          url: targetUrl,
+          domain,
+          title: title || targetUrl,
+          description: description || '',
+          icon: icon || '',
+        };
+
+        const aiResult = await analyzeLinkWithAI(metadataToAnalyze, categories, aiConfig);
+
+        if (aiResult.title && (!title || title === scrapeData?.title)) {
+          setTitle(aiResult.title);
+        }
+        if (aiResult.description) {
+          setDescription(aiResult.description);
+        }
+        if (aiResult.suggestedCategoryId && categories.some(c => c.id === aiResult.suggestedCategoryId)) {
+          setCategoryId(aiResult.suggestedCategoryId);
+        }
+        if (aiResult.tags && aiResult.tags.length > 0) {
+          const newSuggestions = aiResult.tags.filter(t => !tags.includes(t));
+          setSuggestedTags(newSuggestions);
+        }
+      } else {
+        // 未配置 AI Key 时，降级填入抓取到的描述与关键词
+        if (scrapeData?.description && !description) {
+          setDescription(scrapeData.description);
+        }
+        if (scrapeData?.keywords && scrapeData.keywords.length > 0) {
+          const newSuggestions = scrapeData.keywords.filter(t => !tags.includes(t)).slice(0, 5);
+          setSuggestedTags(newSuggestions);
+        }
+      }
     } catch (e) {
-        console.error("AI Assist failed", e);
+      console.error("AI Assist failed", e);
     } finally {
-        setIsGenerating(false);
+      setIsGenerating(false);
     }
   };
 
@@ -260,8 +358,8 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700">
-        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold dark:text-white">
               {initialData ? '编辑链接' : '添加新链接'}
@@ -312,7 +410,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-4 space-y-4">
+        <form onSubmit={handleSave} className="p-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300">标题</label>
             <input
@@ -438,15 +536,16 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
           <div>
             <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium dark:text-slate-300">描述 (选填)</label>
-                {(title && url) && (
+                {url && (
                     <button
                         type="button"
                         onClick={handleAIAssist}
                         disabled={isGenerating}
-                        className="text-xs flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors"
+                        className="text-xs flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors font-medium cursor-pointer"
+                        title="边缘抓取真实网页元数据，调用 AI 自动总结、推荐分类并提取标签"
                     >
-                        {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                        AI 自动填写
+                        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {isGenerating ? 'AI 抓取解析中...' : 'AI 深度解析'}
                     </button>
                 )}
             </div>
@@ -456,6 +555,79 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, onClose, onSave, onDelete
               className="w-full p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all h-20 resize-none"
               placeholder="简短描述..."
             />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium dark:text-slate-300">标签 (选填)</label>
+              <span className="text-xs text-slate-400">回车或逗号添加</span>
+            </div>
+
+            {/* 已添加的标签 */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800"
+                  >
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTag(tag)}
+                      className="hover:text-red-500 rounded-full"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 标签输入框 */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Tag size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  placeholder="添加标签 (如 前端、效率、开源)..."
+                  className="w-full pl-8 pr-2 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAddTag()}
+                disabled={!tagInput.trim()}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                <Plus size={14} />
+                添加
+              </button>
+            </div>
+
+            {/* 建议标签 (AI推荐或网页提取) */}
+            {suggestedTags.length > 0 && (
+              <div className="mt-2 flex items-center flex-wrap gap-1.5 text-xs">
+                <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                  <Sparkles size={12} />
+                  建议标签:
+                </span>
+                {suggestedTags.map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => handleAddTag(st)}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full border border-dashed border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900/30 transition-all cursor-pointer"
+                    title="点击加入标签"
+                  >
+                    + {st}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

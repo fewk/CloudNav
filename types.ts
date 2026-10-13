@@ -9,6 +9,7 @@ export interface LinkItem {
   pinned?: boolean; // New field for pinning
   pinnedOrder?: number; // Field for pinned link sorting order
   emoji?: string; // 自主表情符号，如 ⭐、🔥、❤️ 或自定义
+  tags?: string[]; // 标签列表
 }
 
 export interface Category {
