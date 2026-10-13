@@ -1965,12 +1965,12 @@ function App() {
         style={style}
         className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden ${
           isSortingMode || isSortingPinned
-            ? 'bg-blue-50/50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' 
-            : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
-        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-slate-300/80 dark:hover:border-slate-600/80'} ${
+            ? 'bg-blue-50/50 dark:bg-blue-900/30 ring-1 ring-blue-300 dark:ring-blue-700' 
+            : 'bg-white dark:bg-slate-800'
+        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
-            : 'flex items-center rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
+            ? 'flex flex-col rounded-[10px] p-[14px] min-h-[96px]' 
+            : 'flex items-center rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         {...attributes}
         {...listeners}
@@ -2004,7 +2004,7 @@ function App() {
           
           {/* 第二行：描述文字 */}
           {isDetailedView && link.description && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+            <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
               {link.description}
             </p>
           )}
@@ -2015,7 +2015,7 @@ function App() {
               {link.tags.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
                 >
                   #{tag}
                 </span>
@@ -2044,14 +2044,14 @@ function App() {
         key={link.id}
         className={`group relative transition-all duration-200 ${
           isSelected 
-            ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800' 
+            ? 'bg-red-50 dark:bg-red-900/30 ring-1 ring-red-300 dark:ring-red-800' 
             : isUnassignedHighlight
-              ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-300 dark:border-amber-800/50'
-              : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
-        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-slate-300/80 dark:hover:border-slate-600/80'} ${
+              ? 'bg-amber-50/70 dark:bg-amber-900/20 ring-1 ring-amber-300 dark:ring-amber-800/50'
+              : 'bg-white dark:bg-slate-800'
+        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
-            : 'flex items-center justify-between rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
+            ? 'flex flex-col rounded-[10px] p-[14px] min-h-[96px]' 
+            : 'flex items-center justify-between rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
         onContextMenu={(e) => handleContextMenu(e, link)}
@@ -2087,7 +2087,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
             {isDetailedView && link.description && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+              <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
                 {link.description}
               </p>
             )}
@@ -2098,7 +2098,7 @@ function App() {
                 {link.tags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
                   >
                     #{tag}
                   </span>
@@ -2141,7 +2141,7 @@ function App() {
               </div>
               
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" title={link.title}>
+                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-[#ff6000] dark:group-hover:text-blue-400 transition-colors" title={link.title}>
                   {link.title}
                 </h3>
                 {link.emoji && (
@@ -2154,7 +2154,7 @@ function App() {
             
             {/* 第二行：描述文字 */}
             {isDetailedView && link.description && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+              <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
                 {link.description}
               </p>
             )}
@@ -2170,7 +2170,7 @@ function App() {
                       e.stopPropagation();
                       setSearchQuery(tag);
                     }}
-                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2188,7 +2188,7 @@ function App() {
                       e.stopPropagation();
                       setSearchQuery(tag);
                     }}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2710,107 +2710,149 @@ function App() {
         {/* Content Scroll Area */}
         <div ref={contentScrollRef} onScroll={handleContentScroll} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-10 scroll-smooth">
           
-          {/* 优设导航同款 Hero 大搜索 Banner */}
-          <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 p-6 sm:p-10 shadow-lg text-white">
-            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-            
-            <div className="relative z-10 text-center mb-6">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-wide drop-shadow-sm">
-                {siteSettings.title ? siteSettings.title.replace(' - 我的导航', '') : '百万用户在用的智能导航'}
-              </h1>
-            </div>
+          {/* 优设导航原汁原味 part-search & search-main */}
+          <div className="part-search relative overflow-hidden rounded-[10px] mb-[30px] flex justify-between items-top min-h-[300px] sm:min-h-[346px]" style={{
+            background: 'linear-gradient(180deg, #4a89f0 0%, #7bb3f4 100%)'
+          }}>
+            {/* 左侧插画背景 */}
+            <div 
+              className="bg-l hidden md:block w-[240px] lg:w-[310px] shrink-1 grow-0 bg-cover bg-no-repeat pointer-events-none" 
+              style={{
+                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-left-3.png')",
+                backgroundPosition: "right center"
+              }}
+            />
 
-            <div className="relative z-10 max-w-2xl mx-auto">
-              {/* 连体选项卡 */}
-              <div className="flex items-end gap-1 pl-3">
-                <button
-                  onClick={() => handleSwitchEngine('internal')}
-                  className={`px-4 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all ${
-                    searchMode === 'internal'
-                      ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm -mb-[1px] z-10'
-                      : 'text-white/80 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  常用
-                </button>
-                {externalSearchSources.filter(s => s.enabled).slice(0, 5).map(source => {
-                  const isCur = searchMode === 'external' && (
-                    selectedSearchSource?.id === source.id ||
-                    (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.id === source.id)
-                  );
-                  return (
-                    <button
-                      key={source.id}
-                      onClick={() => handleSwitchEngine(source)}
-                      className={`px-4 py-2 rounded-t-lg text-xs sm:text-sm font-semibold transition-all ${
-                        isCur
-                          ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm -mb-[1px] z-10'
-                          : 'text-white/80 hover:text-white hover:bg-white/10'
+            {/* 底部波浪背景 (before) */}
+            <div 
+              className="absolute bottom-0 left-[15%] right-[15%] h-[60px] bg-center bg-bottom bg-no-repeat bg-contain pointer-events-none" 
+              style={{
+                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-bottom-3.png')"
+              }}
+            />
+
+            {/* search-main 主搜索核心 */}
+            <div className="search-main pt-[36px] sm:pt-[48px] pb-[40px] sm:pb-[80px] px-4 relative text-center flex-1 max-w-[760px] mx-auto z-10 flex flex-col justify-center">
+              <h2 className="search-title text-[28px] sm:text-[40px] text-white whitespace-nowrap font-normal mb-[20px] sm:mb-[32px] tracking-wide" style={{ lineHeight: '1.18' }}>
+                {siteSettings.title ? siteSettings.title.replace(' - 我的导航', '') : '百万用户在用的优设导航'}
+              </h2>
+
+              <div className="s-form relative text-[14px] mb-[18px] sm:mb-[24px] w-full">
+                {/* 选项卡 s-titles */}
+                <div className="s-titles flex items-end text-[14px] text-white whitespace-nowrap overflow-x-auto no-scrollbar ml-[2px]">
+                  <div className={`item ${searchMode === 'internal' ? 'current' : ''}`}>
+                    <span
+                      onClick={() => handleSwitchEngine('internal')}
+                      className={`item-a block px-[18px] sm:px-[20px] rounded-t-[6px] cursor-pointer transition-colors ${
+                        searchMode === 'internal' ? 'bg-white text-[#000] font-medium' : 'text-white/90 hover:text-white hover:bg-white/10'
                       }`}
+                      style={{ height: '30px', lineHeight: '30px' }}
                     >
-                      {source.name}
-                    </button>
-                  );
-                })}
-              </div>
+                      常用
+                    </span>
+                  </div>
+                  {externalSearchSources.filter(s => s.enabled).slice(0, 5).map(source => {
+                    const isCur = searchMode === 'external' && (
+                      selectedSearchSource?.id === source.id ||
+                      (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.id === source.id)
+                    );
+                    return (
+                      <div key={source.id} className={`item ${isCur ? 'current' : ''}`}>
+                        <span
+                          onClick={() => handleSwitchEngine(source)}
+                          className={`item-a block px-[18px] sm:px-[20px] rounded-t-[6px] cursor-pointer transition-colors ${
+                            isCur ? 'bg-white text-[#000] font-medium' : 'text-white/90 hover:text-white hover:bg-white/10'
+                          }`}
+                          style={{ height: '30px', lineHeight: '30px' }}
+                        >
+                          {source.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* 搜索框与橙色大按钮 */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl rounded-tl-none shadow-xl flex items-center p-1.5 border border-white/20">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleTriggerSearch();
+                {/* 输入框与按钮 */}
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleTriggerSearch();
+                      }
+                    }}
+                    placeholder={
+                      searchMode === 'internal'
+                        ? '搜索站内书签、标签或直接输入网址...'
+                        : `在 ${selectedSearchSource?.name || '百度'} 搜索内容...`
                     }
-                  }}
-                  placeholder={
-                    searchMode === 'internal'
-                      ? '搜索站内书签、标签或表情...'
-                      : `在 ${selectedSearchSource?.name || '站外'} 搜索内容...`
-                  }
-                  className="flex-1 px-4 py-2.5 sm:py-3 bg-transparent text-slate-800 dark:text-white placeholder-slate-400 text-sm sm:text-base outline-none"
-                />
-                {searchQuery.trim() && (
+                    className="s block w-full bg-white text-[#3c3c3c] text-[14px] rounded-[6px] border-none outline-none transition-shadow shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                    style={{
+                      padding: '14px 145px 14px 20px',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {searchQuery.trim() && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-[136px] top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                      title="清空"
+                    >
+                      <X size={12} strokeWidth={2.5} />
+                    </button>
+                  )}
                   <button
-                    onClick={() => setSearchQuery('')}
-                    className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 mr-2 transition-colors shrink-0"
-                    title="清空"
+                    onClick={handleTriggerSearch}
+                    className="s-btn absolute right-0 top-0 h-full text-white text-[14px] sm:text-[15px] font-medium border-none cursor-pointer rounded-r-[6px] transition-colors flex items-center justify-center"
+                    style={{
+                      width: '126px',
+                      backgroundColor: '#ff6000'
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e65600')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ff6000')}
                   >
-                    <X size={12} strokeWidth={2.5} />
+                    <span>{submitButtonText}</span>
                   </button>
-                )}
-                <button
-                  onClick={handleTriggerSearch}
-                  className="bg-[#ff5c00] hover:bg-[#e05200] active:scale-95 text-white font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-lg transition-all shadow-md hover:shadow-orange-500/30 flex items-center gap-1.5 shrink-0 text-sm sm:text-base cursor-pointer"
-                >
-                  <span>{submitButtonText}</span>
-                </button>
+                </div>
               </div>
 
-              {/* 热门标签微胶囊 */}
+              {/* 热搜关键词 part-search-keywords */}
               {topHotTags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 mt-3.5 px-1">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-400 text-slate-900 shadow-sm">
-                    <Flame size={12} className="fill-current text-red-600" />
+                <div className="search-keywords part-search-keywords flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[12px] text-white" style={{ lineHeight: '2.5em' }}>
+                  <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-white mr-1" style={{ backgroundColor: '#ff6000' }}>
                     热搜榜
                   </span>
                   {topHotTags.slice(0, 8).map(tag => (
-                    <button
+                    <span
                       key={tag}
                       onClick={() => {
                         setSearchMode('internal');
                         setSearchQuery(tag);
                       }}
-                      className="px-2 py-0.5 rounded text-[11px] font-medium text-white/90 bg-white/15 hover:bg-white/25 hover:text-white transition-all backdrop-blur-sm cursor-pointer"
+                      className="item inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.22)'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.22)')}
                     >
                       #{tag}
-                    </button>
+                    </span>
                   ))}
                 </div>
               )}
             </div>
+
+            {/* 右侧插画背景 */}
+            <div 
+              className="bg-r hidden md:block w-[240px] lg:w-[310px] shrink-1 grow-0 bg-cover bg-no-repeat pointer-events-none" 
+              style={{
+                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-right-3.png')",
+                backgroundPosition: "left center"
+              }}
+            />
           </div>
 
           {/* 搜索视图：当用户输入搜索词时展示全局匹配结果 */}
@@ -2840,7 +2882,7 @@ function App() {
                   <p className="text-sm">没有找到相关内容</p>
                 </div>
               ) : (
-                <div className={`grid gap-3 ${
+                <div className={`grid gap-4 ${
                   siteSettings.cardStyle === 'detailed' 
                     ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                     : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
@@ -2903,7 +2945,7 @@ function App() {
                         items={pinnedLinks.map(link => link.id)}
                         strategy={rectSortingStrategy}
                       >
-                        <div className={`grid gap-3 ${
+                        <div className={`grid gap-4 ${
                           siteSettings.cardStyle === 'detailed' 
                             ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                             : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
@@ -2915,7 +2957,7 @@ function App() {
                       </SortableContext>
                     </DndContext>
                   ) : (
-                    <div className={`grid gap-3 ${
+                    <div className={`grid gap-4 ${
                       siteSettings.cardStyle === 'detailed' 
                         ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                         : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
@@ -3020,7 +3062,7 @@ function App() {
                           items={catLinks.map(link => link.id)}
                           strategy={rectSortingStrategy}
                         >
-                          <div className={`grid gap-3 ${
+                          <div className={`grid gap-4 ${
                             siteSettings.cardStyle === 'detailed' 
                               ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                               : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
@@ -3032,7 +3074,7 @@ function App() {
                         </SortableContext>
                       </DndContext>
                     ) : (
-                      <div className={`grid gap-3 ${
+                      <div className={`grid gap-4 ${
                         siteSettings.cardStyle === 'detailed' 
                           ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
                           : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
