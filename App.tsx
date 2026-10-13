@@ -2334,10 +2334,50 @@ function App() {
         `}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-slate-100 dark:border-slate-700 shrink-0">
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-              {siteSettings.navTitle || 'CloudNav'}
-            </span>
+        <div className="h-16 flex items-center px-5 border-b border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* 品牌专属图标 */}
+            <div className="relative group/logo">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 p-[1.5px] shadow-sm shadow-blue-500/20 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover/logo:scale-105">
+                <div className="w-full h-full rounded-[10px] bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center overflow-hidden">
+                  {siteSettings.favicon ? (
+                    <img 
+                      src={siteSettings.favicon} 
+                      alt="" 
+                      className="w-full h-full object-cover" 
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
+                    />
+                  ) : (
+                    <Cloud size={19} className="text-white fill-white/20 stroke-[2.2]" />
+                  )}
+                </div>
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800" title="服务就绪"></span>
+            </div>
+
+            {/* 品牌字形与微字幕 (Typography & Subtitle) */}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5 leading-none">
+                {(!siteSettings.navTitle || siteSettings.navTitle === 'CloudNav') ? (
+                  <span className="font-brand font-black text-[19px] tracking-tight flex items-baseline">
+                    <span className="text-slate-800 dark:text-white">Cloud</span>
+                    <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400 bg-clip-text text-transparent ml-0.5">Nav</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 mb-1 animate-pulse"></span>
+                  </span>
+                ) : (
+                  <span className="font-brand font-black text-[19px] tracking-tight bg-gradient-to-r from-slate-900 via-blue-700 to-indigo-600 dark:from-white dark:via-blue-300 dark:to-indigo-300 bg-clip-text text-transparent truncate">
+                    {siteSettings.navTitle}
+                  </span>
+                )}
+                <span className="text-[9px] font-black tracking-wider px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/60 uppercase select-none">
+                  PRO
+                </span>
+              </div>
+              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-400 tracking-wider mt-1 truncate select-none">
+                云航 · 智能聚合导航
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Categories List */}
@@ -2514,10 +2554,25 @@ function App() {
         
         {/* Header */}
         <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 shrink-0">
-          <div className="flex items-center gap-4 flex-1">
+          <div className="flex items-center gap-3 sm:gap-4 flex-1">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300">
               <Menu size={24} />
             </button>
+
+            {/* 移动端展示 Mini Brand */}
+            <div className="lg:hidden flex items-center gap-1.5 select-none shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm overflow-hidden">
+                {siteSettings.favicon ? (
+                  <img src={siteSettings.favicon} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                ) : (
+                  <Cloud size={15} className="fill-white/20 stroke-[2.2]" />
+                )}
+              </div>
+              <span className="font-brand font-black text-[16px] tracking-tight flex items-baseline">
+                <span className="text-slate-800 dark:text-white">Cloud</span>
+                <span className="text-blue-500 ml-0.5">Nav</span>
+              </span>
+            </div>
 
             {/* 搜索模式切换 + 搜索框 (UISDC 风格) */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -2717,8 +2772,18 @@ function App() {
 
             {/* search-main 主搜索核心 */}
             <div className="search-main pt-[36px] sm:pt-[44px] pb-[36px] sm:pb-[48px] px-4 relative text-center w-full max-w-[760px] mx-auto z-10 flex flex-col justify-center">
-              <h2 className="search-title text-[28px] sm:text-[40px] text-white whitespace-nowrap font-normal mb-[20px] sm:mb-[32px] tracking-wide" style={{ lineHeight: '1.18' }}>
-                {siteSettings.title ? siteSettings.title.replace(' - 我的导航', '') : '百万用户在用的优设导航'}
+              <h2 className="search-title text-[28px] sm:text-[42px] text-white whitespace-nowrap font-brand font-black tracking-tight mb-[20px] sm:mb-[32px] drop-shadow-sm select-none" style={{ lineHeight: '1.18' }}>
+                {siteSettings.title && siteSettings.title.replace(' - 我的导航', '') !== 'CloudNav' ? (
+                  siteSettings.title.replace(' - 我的导航', '')
+                ) : (
+                  <span className="inline-flex items-center">
+                    <span>Cloud</span>
+                    <span className="text-cyan-300 ml-1">Nav</span>
+                    <span className="hidden sm:inline-block text-[12px] font-bold tracking-wider text-white/90 bg-white/20 px-2.5 py-0.5 rounded-full ml-3 backdrop-blur-sm self-center align-middle font-sans">
+                      云航 · 智能聚合
+                    </span>
+                  </span>
+                )}
               </h2>
 
               <div className="s-form relative text-[14px] mb-[18px] sm:mb-[24px] w-full">
