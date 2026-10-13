@@ -2710,36 +2710,20 @@ function App() {
         {/* Content Scroll Area */}
         <div ref={contentScrollRef} onScroll={handleContentScroll} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-10 scroll-smooth">
           
-          {/* 优设导航原汁原味 part-search & search-main */}
-          <div className="part-search relative overflow-hidden rounded-[10px] mb-[30px] flex justify-between items-top min-h-[300px] sm:min-h-[346px]" style={{
-            background: 'linear-gradient(180deg, #4a89f0 0%, #7bb3f4 100%)'
-          }}>
-            {/* 左侧插画背景 */}
-            <div 
-              className="bg-l hidden md:block w-[240px] lg:w-[310px] shrink-1 grow-0 bg-cover bg-no-repeat pointer-events-none" 
-              style={{
-                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-left-3.png')",
-                backgroundPosition: "right center"
-              }}
-            />
-
-            {/* 底部波浪背景 (before) */}
-            <div 
-              className="absolute bottom-0 left-[15%] right-[15%] h-[60px] bg-center bg-bottom bg-no-repeat bg-contain pointer-events-none" 
-              style={{
-                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-bottom-3.png')"
-              }}
-            />
+          {/* Hero 大搜索 Banner */}
+          <div className="part-search relative overflow-hidden rounded-[10px] sm:rounded-2xl mb-[30px] bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 shadow-lg text-white flex justify-center items-center min-h-[280px] sm:min-h-[320px]">
+            {/* 原来科技感波点网格背景 */}
+            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
 
             {/* search-main 主搜索核心 */}
-            <div className="search-main pt-[36px] sm:pt-[48px] pb-[40px] sm:pb-[80px] px-4 relative text-center flex-1 max-w-[760px] mx-auto z-10 flex flex-col justify-center">
+            <div className="search-main pt-[36px] sm:pt-[44px] pb-[36px] sm:pb-[48px] px-4 relative text-center w-full max-w-[760px] mx-auto z-10 flex flex-col justify-center">
               <h2 className="search-title text-[28px] sm:text-[40px] text-white whitespace-nowrap font-normal mb-[20px] sm:mb-[32px] tracking-wide" style={{ lineHeight: '1.18' }}>
                 {siteSettings.title ? siteSettings.title.replace(' - 我的导航', '') : '百万用户在用的优设导航'}
               </h2>
 
               <div className="s-form relative text-[14px] mb-[18px] sm:mb-[24px] w-full">
-                {/* 选项卡 s-titles */}
-                <div className="s-titles flex items-end text-[14px] text-white whitespace-nowrap overflow-x-auto no-scrollbar ml-[2px]">
+                {/* 选项卡 s-titles：以居中显示 */}
+                <div className="s-titles flex items-end justify-center text-[14px] text-white whitespace-nowrap overflow-x-auto no-scrollbar">
                   <div className={`item ${searchMode === 'internal' ? 'current' : ''}`}>
                     <span
                       onClick={() => handleSwitchEngine('internal')}
@@ -2818,10 +2802,10 @@ function App() {
                 </div>
               </div>
 
-              {/* 热搜关键词 part-search-keywords */}
+              {/* 热搜关键词 part-search-keywords：强制单行不折行 */}
               {topHotTags.length > 0 && (
-                <div className="search-keywords part-search-keywords flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-[12px] text-white" style={{ lineHeight: '2.5em' }}>
-                  <span className="inline-block px-2 py-0.5 rounded text-[11px] font-bold text-white mr-1" style={{ backgroundColor: '#ff6000' }}>
+                <div className="search-keywords part-search-keywords flex flex-nowrap whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 text-[12px] text-white overflow-x-auto no-scrollbar max-w-full" style={{ lineHeight: '2.5em' }}>
+                  <span className="shrink-0 inline-block px-2 py-0.5 rounded text-[11px] font-bold text-white mr-1 select-none" style={{ backgroundColor: '#ff6000' }}>
                     热搜榜
                   </span>
                   {topHotTags.slice(0, 8).map(tag => (
@@ -2831,7 +2815,7 @@ function App() {
                         setSearchMode('internal');
                         setSearchQuery(tag);
                       }}
-                      className="item inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white"
+                      className="item shrink-0 inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white whitespace-nowrap select-none"
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.22)'
                       }}
@@ -2844,15 +2828,6 @@ function App() {
                 </div>
               )}
             </div>
-
-            {/* 右侧插画背景 */}
-            <div 
-              className="bg-r hidden md:block w-[240px] lg:w-[310px] shrink-1 grow-0 bg-cover bg-no-repeat pointer-events-none" 
-              style={{
-                backgroundImage: "url('https://image.uisdc.com/wp-content/uploads/hao.uisdc.com/banner-right-3.png')",
-                backgroundPosition: "left center"
-              }}
-            />
           </div>
 
           {/* 搜索视图：当用户输入搜索词时展示全局匹配结果 */}
