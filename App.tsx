@@ -1862,7 +1862,6 @@ function App() {
       isDragging,
     } = useSortable({ id: link.id });
     
-    // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     
     const style = {
@@ -1876,39 +1875,38 @@ function App() {
       <div
         ref={setNodeRef}
         style={style}
-        className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden hover:shadow-lg hover:shadow-green-100/50 dark:hover:shadow-green-900/20 ${
+        className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden ${
           isSortingMode || isSortingPinned
-            ? 'bg-green-20 dark:bg-green-900/30 border-green-200 dark:border-green-800' 
-            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
-        } ${isDragging ? 'shadow-2xl scale-105' : ''} ${
+            ? 'bg-blue-50/50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700' 
+            : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
+        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-blue-400/60 dark:hover:border-blue-500/60'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-green-400 dark:hover:border-green-500' 
-            : 'flex items-center rounded-xl border shadow-sm hover:border-green-300 dark:hover:border-green-600'
+            ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
+            : 'flex items-center rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         {...attributes}
         {...listeners}
       >
-        {/* 链接内容 - 移除a标签，改为div防止点击跳转 */}
         <div className={`flex flex-1 min-w-0 overflow-hidden ${
-          isDetailedView ? 'flex-col' : 'items-center gap-3'
+          isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
         }`}>
-          {/* 第一行：图标和标题水平排列 */}
-          <div className={`flex items-center gap-3 mb-2 ${
-            isDetailedView ? '' : 'w-full'
-          }`}>
-            {/* Icon */}
-            <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
-              isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
+          {/* 第一行：图标和标题 */}
+          <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+            <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
+              isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
             }`}>
-                {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+              {link.icon ? (
+                <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+              ) : (
+                link.title.charAt(0)
+              )}
             </div>
             
-            {/* 标题 */}
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+              <h3 className={`text-slate-800 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
               }`} title={link.title}>
-                  {link.title}
+                {link.title}
               </h3>
               {link.emoji && (
                 <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
@@ -1919,19 +1917,19 @@ function App() {
           </div>
           
           {/* 第二行：描述文字 */}
-             {isDetailedView && link.description && (
-               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
-                 {link.description}
-               </p>
-             )}
+          {isDetailedView && link.description && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+              {link.description}
+            </p>
+          )}
 
           {/* 第三行：标签展示 */}
           {isDetailedView && link.tags && link.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="flex flex-wrap gap-1 mt-2.5">
               {link.tags.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
                 >
                   #{tag}
                 </span>
@@ -1958,16 +1956,16 @@ function App() {
     return (
       <div
         key={link.id}
-        className={`group relative transition-all duration-200 hover:shadow-lg hover:shadow-blue-100/50 dark:hover:shadow-blue-900/20 ${
+        className={`group relative transition-all duration-200 ${
           isSelected 
-            ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800' 
+            ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800' 
             : isUnassignedHighlight
-              ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50 hover:bg-amber-100 dark:hover:bg-amber-900/30'
-              : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-slate-200 dark:border-slate-700'
-        } ${isBatchEditMode ? 'cursor-pointer' : ''} ${
+              ? 'bg-amber-50/70 dark:bg-amber-900/20 border-amber-300 dark:border-amber-800/50'
+              : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700/60 shadow-sm'
+        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-black/30 hover:border-blue-400/60 dark:hover:border-blue-500/60'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-2xl border shadow-sm p-4 min-h-[100px] hover:border-blue-400 dark:hover:border-blue-500' 
-            : 'flex items-center justify-between rounded-xl border shadow-sm p-3 hover:border-blue-300 dark:hover:border-blue-600'
+            ? 'flex flex-col rounded-xl border p-3.5 min-h-[96px]' 
+            : 'flex items-center justify-between rounded-xl border p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
         onContextMenu={(e) => handleContextMenu(e, link)}
@@ -1975,23 +1973,25 @@ function App() {
         {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
         {isBatchEditMode ? (
           <div className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-            isDetailedView ? 'flex-col' : 'items-center'
+            isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
           }`}>
-            {/* 第一行：图标和标题水平排列 */}
-            <div className={`flex items-center gap-3 w-full`}>
-              {/* Icon */}
-              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
-                isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
+            {/* 第一行：图标和标题 */}
+            <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
+                isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
-                  {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+                {link.icon ? (
+                  <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                ) : (
+                  link.title.charAt(0)
+                )}
               </div>
               
-              {/* 标题 */}
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`text-slate-900 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                  isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium text-slate-800 dark:text-slate-200'
+                <h3 className={`text-slate-800 dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                  isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
                 }`} title={link.title}>
-                    {link.title}
+                  {link.title}
                 </h3>
                 {link.emoji && (
                   <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
@@ -2003,18 +2003,18 @@ function App() {
             
             {/* 第二行：描述文字 */}
             {isDetailedView && link.description && (
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
                 {link.description}
               </p>
             )}
 
             {/* 第三行：标签展示 */}
             {isDetailedView && link.tags && link.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2.5">
                 {link.tags.map((tag, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/70 dark:text-slate-300 select-none"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 dark:bg-slate-700/70 dark:text-slate-300 select-none"
                   >
                     #{tag}
                   </span>
@@ -2026,7 +2026,7 @@ function App() {
                 {link.tags.slice(0, 2).map((tag, idx) => (
                   <span
                     key={idx}
-                    className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
                   >
                     #{tag}
                   </span>
@@ -2040,25 +2040,27 @@ function App() {
             target="_blank"
             rel="noopener noreferrer"
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-              isDetailedView ? 'flex-col' : 'items-center'
+              isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
             }`}
-            title={isDetailedView ? link.url : (link.description || link.url)} // 详情版视图只显示URL作为tooltip
+            title={isDetailedView ? link.url : (link.description || link.url)}
           >
-            {/* 第一行：图标和标题水平排列 */}
-            <div className={`flex items-center gap-3 w-full`}>
-              {/* Icon */}
-              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm font-bold uppercase shrink-0 ${
-                isDetailedView ? 'w-8 h-8 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-800' : 'w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-700'
+            {/* 第一行：图标和标题 */}
+            <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
+                isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
-                  {link.icon ? <img src={link.icon} alt="" className="w-5 h-5"/> : link.title.charAt(0)}
+                {link.icon ? (
+                  <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                ) : (
+                  link.title.charAt(0)
+                )}
               </div>
               
-              {/* 标题 */}
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`text-slate-800 dark:text-slate-200 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
-                  isDetailedView ? 'text-base font-semibold' : 'text-sm font-medium'
+                <h3 className={`text-slate-800 dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
+                  isDetailedView ? 'text-sm font-semibold' : 'text-sm font-medium'
                 }`} title={link.title}>
-                    {link.title}
+                  {link.title}
                 </h3>
                 {link.emoji && (
                   <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
@@ -2069,15 +2071,15 @@ function App() {
             </div>
             
             {/* 第二行：描述文字 */}
-              {isDetailedView && link.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed line-clamp-2">
-                  {link.description}
-                </p>
-              )}
+            {isDetailedView && link.description && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 mt-2">
+                {link.description}
+              </p>
+            )}
 
             {/* 第三行：标签展示 */}
             {isDetailedView && link.tags && link.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2.5">
                 {link.tags.map((tag, idx) => (
                   <span
                     key={idx}
@@ -2086,7 +2088,7 @@ function App() {
                       e.stopPropagation();
                       setSearchQuery(tag);
                     }}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 hover:bg-blue-100 hover:text-blue-700 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2104,7 +2106,7 @@ function App() {
                       e.stopPropagation();
                       setSearchQuery(tag);
                     }}
-                    className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600 dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2120,17 +2122,17 @@ function App() {
           </a>
         )}
 
-        {/* Hover Actions (Absolute Right) - 在批量编辑模式下隐藏 */}
+        {/* Hover Actions */}
         {!isBatchEditMode && (
-          <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-blue-50 dark:bg-blue-900/20 backdrop-blur-sm rounded-md p-1 absolute ${
+          <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-md p-1 absolute ${
             isDetailedView ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
           }`}>
               <button 
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingLink(link); setIsModalOpen(true); }}
-                  className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md"
+                  className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
                   title="编辑"
               >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.08-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.32-.07.64-.07.97c0 .33.03.65.07.97l-2.11 1.63c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.08.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.11-1.63Z" fill="currentColor"/>
                   </svg>
               </button>
@@ -2188,7 +2190,6 @@ function App() {
         categories={categories}
         onUpdateCategories={handleUpdateCategories}
         onDeleteCategory={handleDeleteCategory}
-        onVerifyPassword={handleCategoryActionAuth}
       />
 
       <BackupModal
@@ -2409,22 +2410,21 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-slate-900 overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-full bg-[#f4f5f7] dark:bg-[#0b1120] overflow-hidden relative">
         
         {/* Header */}
-        <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 shrink-0">
+        <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-4 flex-1">
             <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300">
               <Menu size={24} />
             </button>
 
-            {/* 搜索模式切换 + 搜索框 */}
+            {/* 搜索模式切换 + 搜索框 (UISDC 风格) */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              {/* 移动端搜索图标 - 仅在手机端显示，平板端隐藏 */}
+              {/* 移动端搜索图标 - 仅在手机端显示 */}
               <button 
                 onClick={() => {
                   setIsMobileSearchOpen(!isMobileSearchOpen);
-                  // 手机端点击搜索图标时默认使用站外搜索
                   if (searchMode !== 'external') {
                     handleSearchModeChange('external');
                   }
@@ -2435,155 +2435,120 @@ function App() {
                 <Search size={20} />
               </button>
 
-              {/* 搜索模式切换 - 平板端和桌面端显示，手机端隐藏 */}
-              <div className="hidden sm:hidden md:flex lg:flex items-center gap-2 flex-shrink-0">
-                <div className="flex items-center bg-slate-100 dark:bg-slate-700 rounded-full p-1">
-                  <button
-                    onClick={() => handleSearchModeChange('internal')}
-                    className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center justify-center min-h-[24px] min-w-[40px] ${
-                      searchMode === 'internal'
-                        ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100'
-                    }`}
-                    title="站内搜索"
-                  >
-                    站内
-                  </button>
-                  <button
-                    onClick={() => handleSearchModeChange('external')}
-                    className={`px-3 py-1 text-xs font-medium rounded-full transition-all flex items-center justify-center min-h-[24px] min-w-[40px] ${
-                      searchMode === 'external'
-                        ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100'
-                    }`}
-                    title="站外搜索"
-                  >
-                    站外
-                  </button>
-                </div>
-                
-                {/* 搜索配置管理按钮 */}
-                {searchMode === 'external' && (
-                  <button
-                    onClick={() => setIsSearchConfigModalOpen(true)}
-                    className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
-                    title="管理搜索源"
-                  >
-                    <Settings size={14} />
-                  </button>
-                )}
+              {/* 搜索引擎平铺 Tabs (UISDC 风格) */}
+              <div className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-700/70 p-1 rounded-full text-xs shrink-0 border border-slate-200/50 dark:border-slate-600/50">
+                <button
+                  onClick={() => handleSearchModeChange('internal')}
+                  className={`px-3 py-1 rounded-full transition-all flex items-center gap-1 ${
+                    searchMode === 'internal'
+                      ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title="站内书签与标签搜索"
+                >
+                  <span>站内</span>
+                </button>
+                {externalSearchSources.filter(s => s.enabled).slice(0, 4).map((source) => {
+                  const isCurrent = searchMode === 'external' && (
+                    selectedSearchSource?.name === source.name ||
+                    (!selectedSearchSource && externalSearchSources.filter(s => s.enabled)[0]?.name === source.name)
+                  );
+                  return (
+                    <button
+                      key={source.name}
+                      onClick={() => {
+                        handleSearchModeChange('external');
+                        handleSearchSourceSelect(source);
+                      }}
+                      className={`px-2.5 py-1 rounded-full transition-all flex items-center gap-1.5 ${
+                        isCurrent
+                          ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 font-semibold shadow-sm'
+                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <img
+                        src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL(source.url).hostname}`}
+                        alt=""
+                        className="w-3.5 h-3.5"
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                      />
+                      <span>{source.name}</span>
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setIsSearchConfigModalOpen(true)}
+                  className="p-1 text-slate-400 hover:text-blue-500 rounded-full transition-colors ml-0.5"
+                  title="管理搜索引擎"
+                >
+                  <Settings size={13} />
+                </button>
               </div>
 
-              {/* 搜索框 */}
-              <div className={`relative w-full max-w-lg ${isMobileSearchOpen ? 'block' : 'hidden'} sm:block`}>
-                {/* 搜索源选择弹出窗口 */}
-                {searchMode === 'external' && showSearchSourcePopup && (
-                  <div 
-                    className="absolute left-0 top-full mt-2 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-3 z-50"
-                    onMouseEnter={() => setIsPopupHovered(true)}
-                    onMouseLeave={() => setIsPopupHovered(false)}
-                  >
-                    <div className="grid grid-cols-5 sm:grid-cols-5 gap-2">
-                      {externalSearchSources
-                        .filter(source => source.enabled)
-                        .map((source, index) => (
-                          <button
-                            key={index}
-                            onClick={() => handleSearchSourceSelect(source)}
-                            onMouseEnter={() => setHoveredSearchSource(source)}
-                            onMouseLeave={() => setHoveredSearchSource(null)}
-                            className="px-2 py-2 text-sm rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center gap-1 justify-center"
-                          >
-                            <img 
-                              src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL(source.url).hostname}`}
-                              alt={source.name}
-                              className="w-4 h-4"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXNlYXJjaCI+PHBhdGggZD0ibTIxIDIxLTQuMzQtNC4zNCI+PC9wYXRoPjxjaXJjbGUgY3g9IjExIiBjeT0iMTEiIHI9IjgiPjwvY2lyY2xlPjwvc3ZnPg==';
-                              }}
-                            />
-                            <span className="truncate hidden sm:inline">{source.name}</span>
-                          </button>
-                        ))}
-                    </div>
+              {/* 搜索框 (UISDC 现代高光胶囊) */}
+              <div className={`relative flex-1 max-w-lg ${isMobileSearchOpen ? 'block' : 'hidden'} sm:block`}>
+                <div className="flex items-center w-full bg-slate-100 dark:bg-slate-700/60 hover:bg-white dark:hover:bg-slate-700/90 focus-within:bg-white dark:focus-within:bg-slate-800 rounded-full border border-slate-200/60 dark:border-slate-600/50 focus-within:border-blue-500/70 dark:focus-within:border-blue-400 shadow-sm focus-within:shadow-md focus-within:ring-2 focus-within:ring-blue-500/20 transition-all pl-3.5 pr-2 py-1.5">
+                  <div className="text-slate-400 shrink-0 mr-2 flex items-center">
+                    {searchMode === 'internal' ? (
+                      <Search size={15} />
+                    ) : (selectedSearchSource || externalSearchSources.filter(s => s.enabled)[0]) ? (
+                      <img 
+                        src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL((selectedSearchSource || externalSearchSources.filter(s => s.enabled)[0]).url).hostname}`}
+                        alt=""
+                        className="w-4 h-4"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <Search size={15} />
+                    )}
                   </div>
-                )}
-                
-                {/* 搜索图标 */}
-                <div 
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
-                  onMouseEnter={() => searchMode === 'external' && setIsIconHovered(true)}
-                  onMouseLeave={() => setIsIconHovered(false)}
-                  onClick={() => {
-                    // 移动端点击事件：显示搜索源选择窗口
-                    if (searchMode === 'external') {
-                      setShowSearchSourcePopup(!showSearchSourcePopup);
+
+                  <input
+                    type="text"
+                    placeholder={
+                      searchMode === 'internal' 
+                        ? "搜索站内书签、标签或表情..." 
+                        : selectedSearchSource 
+                          ? `在 ${selectedSearchSource.name} 搜索内容...` 
+                          : "搜索站外内容..."
                     }
-                  }}
-                >
-                  {searchMode === 'internal' ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-search">
-                      <path d="m21 21-4.35-4.35"></path>
-                      <circle cx="11" cy="11" r="8"></circle>
-                    </svg>
-                  ) : (hoveredSearchSource || selectedSearchSource) ? (
-                    <img 
-                      src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL((hoveredSearchSource || selectedSearchSource).url).hostname}`}
-                      alt={(hoveredSearchSource || selectedSearchSource).name}
-                      className="w-4 h-4"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGNsYXNzPSJsdWNpZGUgbHVjaWRlLXNlYXJjaCI+PHBhdGggZD0ibTIxIDIxLTQuMzQtNC4zNCI+PC9wYXRoPjxjaXJjbGUgY3g9IjExIiBjeT0iMTEiIHI9IjgiPjwvY2lyY2xlPjwvc3ZnPg==';
-                      }}
-                    />
-                  ) : (
-                    <Search size={16} />
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchMode === 'external') {
+                        handleExternalSearch();
+                      }
+                    }}
+                    className="w-full bg-transparent border-none text-sm dark:text-white placeholder-slate-400 outline-none"
+                    style={{ fontSize: '14px' }}
+                    inputMode="search"
+                    enterKeyHint="search"
+                  />
+
+                  {searchQuery.trim() && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-600 text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-500 transition-colors mr-1.5 shrink-0"
+                      title="清空"
+                    >
+                      <X size={11} strokeWidth={2.5} />
+                    </button>
+                  )}
+
+                  {searchMode === 'external' && searchQuery.trim() && (
+                    <button
+                      onClick={handleExternalSearch}
+                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-medium flex items-center gap-1 transition-colors shrink-0 shadow-sm"
+                      title="执行站外搜索"
+                    >
+                      <span>搜索</span>
+                      <ExternalLink size={12} />
+                    </button>
                   )}
                 </div>
-                
-                <input
-                  type="text"
-                  placeholder={
-                    searchMode === 'internal' 
-                      ? "搜索站内内容..." 
-                      : selectedSearchSource 
-                        ? `在${selectedSearchSource.name}搜索内容` 
-                        : "搜索站外内容..."
-                  }
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && searchMode === 'external') {
-                      handleExternalSearch();
-                    }
-                  }}
-                  className="w-full pl-9 pr-4 py-2 rounded-full bg-slate-100 dark:bg-slate-700/50 border-none text-sm focus:ring-2 focus:ring-blue-500 dark:text-white placeholder-slate-400 outline-none transition-all"
-                  // 移动端优化：防止页面缩放
-                  style={{ fontSize: '16px' }}
-                  inputMode="search"
-                  enterKeyHint="search"
-                />
-                
-                {searchMode === 'external' && searchQuery.trim() && (
-                  <button
-                    onClick={handleExternalSearch}
-                    className="absolute right-10 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-500"
-                    title="执行站外搜索"
-                  >
-                    <ExternalLink size={14} />
-                  </button>
-                )}
-                
-                {searchQuery.trim() && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 dark:hover:text-red-400 transition-all"
-                    title="清空搜索"
-                  >
-                    <X size={12} strokeWidth={2.5} />
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -2652,12 +2617,12 @@ function App() {
             {pinnedLinks.length > 0 && !searchQuery && (selectedCategory === 'all') && (
                 <section>
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <Pin size={16} className="text-blue-500 fill-blue-500" />
-                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                置顶 / 常用
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
+                            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                热门推荐
                             </h2>
-                            <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
+                            <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
                                 {pinnedLinks.length}
                             </span>
                         </div>
@@ -2740,6 +2705,7 @@ function App() {
 
                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                      <div className="flex items-center flex-wrap gap-y-2">
+                         <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0 mr-2.5"></div>
                          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mr-4">
                              {selectedCategory === 'all' 
                                 ? (searchQuery ? '搜索结果' : '所有链接') 
@@ -2798,7 +2764,7 @@ function App() {
                              }
                          </h2>
                          {selectedCategory !== 'all' && (
-                           <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full">
+                           <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
                              {displayedLinks.length}
                            </span>
                          )}
@@ -2969,17 +2935,15 @@ function App() {
             {/* 其他目录搜索结果区域 */}
             {searchQuery.trim() && selectedCategory !== 'all' && (
               <section className="mt-8 pt-8 border-t-2 border-slate-200 dark:border-slate-700">
-                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-folder-search">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                    <path d="M11 11h.01"></path>
-                  </svg>
-                  其他目录搜索结果
-                  <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 rounded-full">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-1.5 h-4 bg-gradient-to-b from-purple-500 to-indigo-600 rounded-full shrink-0"></div>
+                  <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    其他目录搜索结果
+                  </h2>
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-full border border-purple-100 dark:border-purple-800/40">
                     {Object.values(otherCategoryResults).flat().length}
                   </span>
-                </h2>
+                </div>
 
                 {Object.keys(otherCategoryResults).length > 0 ? (
                   Object.entries(otherCategoryResults).map(([categoryId, links]) => {
@@ -2989,6 +2953,7 @@ function App() {
                     return (
                       <div key={categoryId} className="mb-6 last:mb-0">
                         <div className="flex items-center gap-2 mb-3">
+                          <div className="w-1 h-3 bg-slate-300 dark:bg-slate-600 rounded-full shrink-0"></div>
                           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                             {category.name}
                           </h3>

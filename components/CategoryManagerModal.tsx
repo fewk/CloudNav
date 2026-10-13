@@ -140,43 +140,15 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     }
   };
 
-  // 处理编辑分类前的验证
+  // 处理编辑分类 (直接开启编辑，已登录状态无需重复验证密码)
   const handleStartEdit = (cat: Category) => {
-    if (!onVerifyPassword) {
-      // 如果没有提供验证函数，直接编辑
-      startEdit(cat);
-      return;
-    }
-
-    // 设置待处理的操作
-    setPendingAction({
-      type: 'edit',
-      categoryId: cat.id,
-      categoryName: cat.name
-    });
-    
-    // 打开验证弹窗
-    setIsAuthModalOpen(true);
+    startEdit(cat);
   };
 
-  // 处理删除分类前的验证
+  // 处理删除分类 (直接打开删除确认弹窗)
   const handleDeleteClick = (cat: Category) => {
-    if (!onVerifyPassword) {
-      // 如果没有提供验证函数，直接打开删除确认弹窗
-      setDeletingCategory(cat);
-      setIsDeleteModalOpen(true);
-      return;
-    }
-
-    // 设置待处理的操作
-    setPendingAction({
-      type: 'delete',
-      categoryId: cat.id,
-      categoryName: cat.name
-    });
-    
-    // 打开验证弹窗
-    setIsAuthModalOpen(true);
+    setDeletingCategory(cat);
+    setIsDeleteModalOpen(true);
   };
 
   // 处理验证成功后的操作
