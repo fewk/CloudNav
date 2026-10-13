@@ -809,7 +809,7 @@ function App() {
 
   // --- Actions ---
 
-  const handleLogin = async (password: string): Promise<boolean> => {
+  const handleLogin = async (password: string, rememberForever: boolean = false): Promise<boolean> => {
       try {
         // 首先验证密码
         const authResponse = await fetch('/api/storage', {
@@ -827,19 +827,25 @@ function App() {
             setIsAuthOpen(false);
             setSyncStatus('saved');
             
-            // 登录成功后，获取网站配置（包括密码过期时间设置）
+            // 确定过期天数：如果勾选了“永不退出”，设为 0，否则默认 7 天
+            let newExpiryDays = rememberForever ? 0 : 7;
+            
+            // 登录成功后，获取网站配置
             try {
                 const websiteConfigRes = await fetch('/api/storage?getConfig=website');
                 if (websiteConfigRes.ok) {
                     const websiteConfigData = await websiteConfigRes.json();
                     if (websiteConfigData) {
+                        if (!rememberForever && websiteConfigData.passwordExpiryDays !== undefined && websiteConfigData.passwordExpiryDays !== 0) {
+                            newExpiryDays = websiteConfigData.passwordExpiryDays;
+                        }
                         setSiteSettings(prev => ({
                             ...prev,
                             title: websiteConfigData.title || prev.title,
                             navTitle: websiteConfigData.navTitle || prev.navTitle,
                             favicon: websiteConfigData.favicon || prev.favicon,
                             cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                            passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
+                            passwordExpiryDays: newExpiryDays
                         }));
                     }
                 }
@@ -847,27 +853,35 @@ function App() {
                 console.warn("Failed to fetch website config after login.", e);
             }
             
-            // 检查密码是否过期
-            const lastLoginTime = localStorage.getItem('lastLoginTime');
-            const currentTime = Date.now();
-            
-            if (lastLoginTime) {
-                const lastLogin = parseInt(lastLoginTime);
-                const timeDiff = currentTime - lastLogin;
-                
-                const expiryDays = siteSettings.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7;
-                const expiryTimeMs = expiryDays > 0 ? expiryDays * 24 * 60 * 60 * 1000 : 0;
-                
-                if (expiryTimeMs > 0 && timeDiff > expiryTimeMs) {
-                    setAuthToken('');
-                    localStorage.removeItem(AUTH_KEY);
-                    setIsAuthOpen(true);
-                    alert('您的密码已过期，请重新登录');
-                    return false;
+            setSiteSettings(prev => {
+                const updated = {
+                    ...prev,
+                    passwordExpiryDays: newExpiryDays
+                };
+                localStorage.setItem('cloudnav_site_settings', JSON.stringify(updated));
+                return updated;
+            });
+
+            // 如果勾选了永不退出，同步保存到 KV 空间
+            if (rememberForever) {
+                try {
+                    await fetch('/api/storage', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-auth-password': password
+                        },
+                        body: JSON.stringify({
+                            saveConfig: 'website',
+                            config: { ...siteSettings, passwordExpiryDays: 0 }
+                        })
+                    });
+                } catch (e) {
+                    console.warn("Failed to sync website config to KV after login.", e);
                 }
             }
             
-            localStorage.setItem('lastLoginTime', currentTime.toString());
+            localStorage.setItem('lastLoginTime', Date.now().toString());
             
             // 登录成功后，从服务器获取数据
             try {
@@ -2021,7 +2035,11 @@ function App() {
                 此导航页面设置了访问密码，请输入密码以继续访问
               </p>
             </div>
-            <AuthModal isOpen={true} onLogin={handleLogin} />
+            <AuthModal 
+              isOpen={true} 
+              onLogin={handleLogin} 
+              defaultRememberForever={siteSettings.passwordExpiryDays === 0}
+            />
           </div>
         </div>
       )}
@@ -2029,7 +2047,11 @@ function App() {
       {/* 主要内容 - 只有在不需要认证或已认证时显示 */}
       {(!requiresAuth || authToken) && (
         <>
-          <AuthModal isOpen={isAuthOpen} onLogin={handleLogin} />
+          <AuthModal 
+            isOpen={isAuthOpen} 
+            onLogin={handleLogin} 
+            defaultRememberForever={siteSettings.passwordExpiryDays === 0}
+          />
       
       <CategoryAuthModal 
         isOpen={!!catAuthModalData}

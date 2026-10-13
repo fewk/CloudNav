@@ -3,11 +3,13 @@ import { Lock, ArrowRight, Loader2 } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
-  onLogin: (password: string) => Promise<boolean>;
+  onLogin: (password: string, rememberForever: boolean) => Promise<boolean>;
+  defaultRememberForever?: boolean;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, defaultRememberForever = false }) => {
   const [password, setPassword] = useState('');
+  const [rememberForever, setRememberForever] = useState(defaultRememberForever);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,7 +20,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin }) => {
     setIsLoading(true);
     setError('');
     
-    const success = await onLogin(password);
+    const success = await onLogin(password, rememberForever);
     if (!success) {
       setError('密码错误或无法连接服务器');
     }
@@ -48,6 +50,22 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin }) => {
               placeholder="访问密码"
               autoFocus
             />
+          </div>
+
+          {/* 登录时记住登录状态勾选 */}
+          <div className="flex items-center justify-between px-1 py-0.5">
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <input
+                type="checkbox"
+                checked={rememberForever}
+                onChange={(e) => setRememberForever(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <span>永不退出（直至修改密码）</span>
+            </label>
+            <span className="text-[11px] text-slate-400">
+              {rememberForever ? '永久保持' : '默认 7 天'}
+            </span>
           </div>
 
           {error && (
