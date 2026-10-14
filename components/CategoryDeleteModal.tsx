@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Trash2, AlertCircle } from 'lucide-react';
 import { Category } from '../types';
 
@@ -21,6 +21,16 @@ const CategoryDeleteModal: React.FC<CategoryDeleteModalProps> = ({
 }) => {
   const [mode, setMode] = useState<'migrate' | 'delete_all'>('migrate');
 
+  // ESC 键自动关闭窗口
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // 过滤掉当前要删除的分类及其子分类（如果是父分类的话）
   const availableCategories = categories.filter(c => {
     if (c.id === categoryId) return false;
@@ -39,8 +49,14 @@ const CategoryDeleteModal: React.FC<CategoryDeleteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
+    <div 
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div 
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-start p-6">
           <div className="flex gap-4">
             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl text-red-500">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag } from 'lucide-react';
-import { AIConfig, LinkItem, Category, SiteSettings } from '../types';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { AIConfig, LinkItem, Category, SiteSettings, ExternalSearchSource } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
 import JSZip from 'jszip';
 
@@ -14,6 +14,8 @@ interface SettingsModalProps {
   categories: Category[];
   onUpdateLinks: (links: LinkItem[]) => void;
   authToken: string | null;
+  externalSearchSources?: ExternalSearchSource[];
+  onSaveSearchSources?: (sources: ExternalSearchSource[]) => void;
 }
 
 const getRandomColor = () => {
@@ -58,10 +60,77 @@ const generateSvgIcon = (text: string, color1: string, color2: string) => {
 };
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
-    isOpen, onClose, config, siteSettings, onSave, links, categories, onUpdateLinks, authToken 
+    isOpen, onClose, config, siteSettings, onSave, links, categories, onUpdateLinks, authToken,
+    externalSearchSources, onSaveSearchSources
 }) => {
-  const [activeTab, setActiveTab] = useState<'site' | 'ai' | 'tools'>('site');
+  const [activeTab, setActiveTab] = useState<'site' | 'search' | 'ai' | 'tools'>('site');
   const [localConfig, setLocalConfig] = useState<AIConfig>(config);
+  
+  const [localSearchSources, setLocalSearchSources] = useState<ExternalSearchSource[]>(externalSearchSources || []);
+  const [newSource, setNewSource] = useState<Partial<ExternalSearchSource>>({
+    name: '',
+    url: '',
+    icon: 'Globe',
+    enabled: true
+  });
+
+  useEffect(() => {
+    if (externalSearchSources) {
+      setLocalSearchSources(externalSearchSources);
+    }
+  }, [externalSearchSources, isOpen]);
+
+  // ESC 键自动关闭窗口
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleAddSource = () => {
+    if (!newSource.name?.trim() || !newSource.url?.trim()) return;
+    const source: ExternalSearchSource = {
+      id: Date.now().toString(),
+      name: newSource.name.trim(),
+      url: newSource.url.trim(),
+      icon: newSource.icon || 'Globe',
+      enabled: newSource.enabled !== false,
+      createdAt: Date.now()
+    };
+    const updated = [...localSearchSources, source];
+    setLocalSearchSources(updated);
+    if (onSaveSearchSources) onSaveSearchSources(updated);
+    setNewSource({ name: '', url: '', icon: 'Globe', enabled: true });
+  };
+
+  const handleToggleSourceEnabled = (id: string) => {
+    const updated = localSearchSources.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s);
+    setLocalSearchSources(updated);
+    if (onSaveSearchSources) onSaveSearchSources(updated);
+  };
+
+  const handleDeleteSource = (id: string) => {
+    const updated = localSearchSources.filter(s => s.id !== id);
+    setLocalSearchSources(updated);
+    if (onSaveSearchSources) onSaveSearchSources(updated);
+  };
+
+  const handleResetSources = () => {
+    const defaultSources: ExternalSearchSource[] = [
+      { id: 'baidu', name: '百度', url: 'https://www.baidu.com/s?wd={query}', icon: 'Globe', enabled: true, createdAt: 1 },
+      { id: 'google', name: 'Google', url: 'https://www.google.com/search?q={query}', icon: 'Search', enabled: true, createdAt: 2 },
+      { id: 'bing', name: '必应', url: 'https://www.bing.com/search?q={query}', icon: 'Search', enabled: true, createdAt: 3 },
+      { id: 'github', name: 'GitHub', url: 'https://github.com/search?q={query}', icon: 'Github', enabled: true, createdAt: 4 },
+      { id: 'bilibili', name: 'B站', url: 'https://search.bilibili.com/all?keyword={query}', icon: 'Play', enabled: true, createdAt: 5 },
+    ];
+    setLocalSearchSources(defaultSources);
+    if (onSaveSearchSources) onSaveSearchSources(defaultSources);
+  };
   
   const [localSiteSettings, setLocalSiteSettings] = useState<SiteSettings>(() => ({
       title: siteSettings?.title || 'CloudNav - 我的导航',
@@ -1027,15 +1096,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const tabs = [
     { id: 'site', label: '网站设置', icon: LayoutTemplate },
+    { id: 'search', label: '搜索引擎', icon: Search },
     { id: 'ai', label: 'AI 设置', icon: Bot },
     { id: 'tools', label: '扩展工具', icon: Wrench },
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-200 dark:border-slate-700 flex max-h-[90vh] flex-col md:flex-row">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div 
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl md:w-[880px] h-[660px] max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row"
+        onClick={(e) => e.stopPropagation()}
+      >
         
-        <div className="w-full md:w-48 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col p-2 gap-1 overflow-x-auto shrink-0">
+        <div className="w-full md:w-48 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 flex flex-row md:flex-col p-2 gap-1 overflow-x-auto md:overflow-y-auto shrink-0 md:h-full">
             {tabs.map(tab => (
                 <button
                     key={tab.id}
@@ -1052,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ))}
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden bg-white dark:bg-slate-800">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-white dark:bg-slate-800">
              <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
                 <h3 className="text-lg font-semibold dark:text-white">设置</h3>
                 <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
@@ -1246,6 +1322,132 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         : `默认 7 天：未操作 ${localSiteSettings.passwordExpiryDays || 7} 天后需重新验证密码`}
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'search' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* 添加新搜索引擎 */}
+                        <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200/80 dark:border-slate-600/80">
+                            <h4 className="text-sm font-semibold dark:text-white mb-3 flex items-center gap-2">
+                                <Plus size={16} className="text-blue-500" /> 添加自定义搜索引擎
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">名称</label>
+                                    <input
+                                        type="text"
+                                        value={newSource.name || ''}
+                                        onChange={(e) => setNewSource({ ...newSource, name: e.target.value })}
+                                        placeholder="例如：知乎"
+                                        className="w-full p-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">搜索 URL</label>
+                                    <input
+                                        type="text"
+                                        value={newSource.url || ''}
+                                        onChange={(e) => setNewSource({ ...newSource, url: e.target.value })}
+                                        placeholder="例如：https://www.zhihu.com/search?type=content&q={query}"
+                                        className="w-full p-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="mt-3 flex justify-between items-center">
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                    提示：URL 中必须包含 <code className="bg-slate-200 dark:bg-slate-600 px-1 py-0.5 rounded text-blue-600 dark:text-blue-300">{'{query}'}</code> 占位符
+                                </span>
+                                <button
+                                    onClick={handleAddSource}
+                                    disabled={!newSource.name?.trim() || !newSource.url?.trim()}
+                                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                                >
+                                    <Plus size={14} /> 添加引擎
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 已配置的搜索引擎列表 */}
+                        <div>
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-semibold dark:text-white flex items-center gap-2">
+                                    <Globe size={16} className="text-blue-500" /> 已配置搜索引擎
+                                </h4>
+                                <button
+                                    onClick={handleResetSources}
+                                    className="text-xs text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                                    title="恢复默认自带搜索引擎列表"
+                                >
+                                    <RotateCcw size={12} /> 恢复默认配置
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {localSearchSources.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-500 dark:text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                                        <Globe size={28} className="mx-auto mb-2 opacity-40" />
+                                        <p className="text-xs">暂无配置的搜索引擎</p>
+                                    </div>
+                                ) : (
+                                    localSearchSources.map((source) => (
+                                        <div 
+                                            key={source.id} 
+                                            className="flex items-center justify-between p-3 bg-slate-50/70 dark:bg-slate-700/50 border border-slate-200/80 dark:border-slate-600/60 rounded-xl"
+                                        >
+                                            <div className="flex items-center gap-3 flex-1 min-w-0 mr-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={source.enabled}
+                                                    onChange={() => handleToggleSourceEnabled(source.id)}
+                                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                                    title={source.enabled ? "点击禁用" : "点击启用"}
+                                                />
+                                                <img
+                                                    src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL(source.url).hostname}`}
+                                                    alt=""
+                                                    className="w-4 h-4 shrink-0"
+                                                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold text-sm dark:text-white truncate">{source.name}</span>
+                                                        {source.enabled ? (
+                                                            <span className="px-1.5 py-0.2 text-[10px] bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded font-medium">
+                                                                已启用
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-1.5 py-0.2 text-[10px] bg-slate-100 dark:bg-slate-600 text-slate-500 dark:text-slate-300 rounded font-medium">
+                                                                未启用
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400 dark:text-slate-400 truncate font-mono">
+                                                        {source.url}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleDeleteSource(source.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                title="删除"
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 说明卡片 */}
+                        <div className="p-3 bg-blue-50/70 dark:bg-blue-900/20 rounded-xl border border-blue-200/70 dark:border-blue-800/60 text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                            <p className="font-semibold flex items-center gap-1"><Info size={14} /> 聚合搜索引擎说明：</p>
+                            <p>• 启用的前几个搜索引擎将平铺展示在首页 Banner 和顶部搜索框内。</p>
+                            <p>• 支持任意包含搜索词占位符的网址，例如知乎、豆瓣、小红书、GitHub、Linux.do 等。</p>
+                            <p>• 配置会自动同步至 Cloudflare KV 云端数据库，换设备自动保持一致。</p>
                         </div>
                     </div>
                 )}

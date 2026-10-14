@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
-import { Lock, ArrowRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, ArrowRight, Loader2, X } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
+  onClose?: () => void;
   onLogin: (password: string, rememberForever: boolean) => Promise<boolean>;
   defaultRememberForever?: boolean;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, defaultRememberForever = false }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, defaultRememberForever = false }) => {
   const [password, setPassword] = useState('');
   const [rememberForever, setRememberForever] = useState(defaultRememberForever);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // ESC 键自动关闭窗口（若允许关闭）
+  useEffect(() => {
+    if (!isOpen || !onClose) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -28,8 +39,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onLogin, defaultRememberF
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 dark:border-slate-700 p-8">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md"
+      onClick={(e) => { if (onClose && e.target === e.currentTarget) onClose(); }}
+    >
+      <div 
+        className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 dark:border-slate-700 p-8 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {onClose && (
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="absolute top-4 right-4 p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            title="关闭"
+          >
+            <X size={18} />
+          </button>
+        )}
         <div className="flex flex-col items-center mb-6">
           <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
             <Lock size={32} />

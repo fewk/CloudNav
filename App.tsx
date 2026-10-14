@@ -2174,6 +2174,7 @@ function App() {
             {isAuthOpen && (
               <AuthModal 
                 isOpen={isAuthOpen} 
+                onClose={() => setIsAuthOpen(false)}
                 onLogin={handleLogin} 
                 defaultRememberForever={siteSettings.passwordExpiryDays === 0}
               />
@@ -2237,6 +2238,8 @@ function App() {
                 categories={categories}
                 onUpdateLinks={(newLinks) => updateData(newLinks, categories)}
                 authToken={authToken}
+                externalSearchSources={externalSearchSources}
+                onSaveSearchSources={handleSaveSearchSources}
               />
             )}
 
@@ -2566,13 +2569,6 @@ function App() {
                     </button>
                   );
                 })}
-                <button
-                  onClick={() => setIsSearchConfigModalOpen(true)}
-                  className="p-1 text-slate-400 hover:text-blue-500 rounded-full transition-colors ml-0.5"
-                  title="管理搜索引擎"
-                >
-                  <Settings size={13} />
-                </button>
               </div>
 
               {/* 搜索框 (UISDC 现代高光胶囊) */}
