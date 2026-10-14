@@ -25,24 +25,26 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig } from './types';
-import { parseBookmarks } from './services/bookmarkParser';
 import Icon from './components/Icon';
-import LinkModal from './components/LinkModal';
-import AuthModal from './components/AuthModal';
-import CategoryManagerModal from './components/CategoryManagerModal';
-import BackupModal from './components/BackupModal';
-import CategoryAuthModal from './components/CategoryAuthModal';
-import ImportModal from './components/ImportModal';
-import SettingsModal from './components/SettingsModal';
-import SearchConfigModal from './components/SearchConfigModal';
 import ContextMenu from './components/ContextMenu';
-import QRCodeModal from './components/QRCodeModal';
+
+// 懒加载所有模态框组件与重量级依赖（@google/genai, jszip等），极大压缩首屏与新标签页 JS 体积
+const LinkModal = React.lazy(() => import('./components/LinkModal'));
+const AuthModal = React.lazy(() => import('./components/AuthModal'));
+const CategoryManagerModal = React.lazy(() => import('./components/CategoryManagerModal'));
+const BackupModal = React.lazy(() => import('./components/BackupModal'));
+const CategoryAuthModal = React.lazy(() => import('./components/CategoryAuthModal'));
+const ImportModal = React.lazy(() => import('./components/ImportModal'));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
+const SearchConfigModal = React.lazy(() => import('./components/SearchConfigModal'));
+const QRCodeModal = React.lazy(() => import('./components/QRCodeModal'));
 
 // --- 配置项 ---
 // 项目核心仓库地址
 const GITHUB_REPO_URL = 'https://github.com/aabacada/CloudNav-abcd';
 
 const LOCAL_STORAGE_KEY = 'cloudnav_data_cache';
+const FAVICON_CACHE_KEY = 'cloudnav_favicon_cache';
 const DEFAULT_SEARCH_SOURCES: ExternalSearchSource[] = [
   { id: 'baidu', name: '百度', url: 'https://www.baidu.com/s?wd={query}', icon: 'Globe', enabled: true, createdAt: 1 },
   { id: 'google', name: 'Google', url: 'https://www.google.com/search?q={query}', icon: 'Search', enabled: true, createdAt: 2 },
@@ -56,19 +58,65 @@ const WEBDAV_CONFIG_KEY = 'cloudnav_webdav_config';
 const AI_CONFIG_KEY = 'cloudnav_ai_config';
 const SEARCH_CONFIG_KEY = 'cloudnav_search_config';
 
+// 预加载本地缓存数据（实现 Chrome 新标签页 0 延迟秒开）
+function getInitialNavData(): { links: LinkItem[]; categories: Category[] } {
+  try {
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      let loadedCategories = parsed.categories || DEFAULT_CATEGORIES;
+      if (!loadedCategories.some((c: Category) => c.id === 'common')) {
+        loadedCategories = [{ id: 'common', name: '常用推荐', icon: 'Star' }, ...loadedCategories];
+      }
+      const validCategoryIds = new Set(loadedCategories.map((c: Category) => c.id));
+      let loadedLinks = (parsed.links || INITIAL_LINKS).map((link: LinkItem) => {
+        if (!validCategoryIds.has(link.categoryId)) {
+          return { ...link, categoryId: 'common' };
+        }
+        return link;
+      });
+      return { links: loadedLinks, categories: loadedCategories };
+    }
+  } catch (e) {}
+  return { links: INITIAL_LINKS, categories: DEFAULT_CATEGORIES };
+}
+
+function getInitialSearchConfig(): { mode: SearchMode; sources: ExternalSearchSource[]; selected: ExternalSearchSource | null } {
+  try {
+    const saved = localStorage.getItem(SEARCH_CONFIG_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        mode: parsed.mode || 'external',
+        sources: (parsed.externalSources && parsed.externalSources.length > 0) ? parsed.externalSources : DEFAULT_SEARCH_SOURCES,
+        selected: parsed.selectedSource || null
+      };
+    }
+  } catch (e) {}
+  return {
+    mode: 'external',
+    sources: DEFAULT_SEARCH_SOURCES,
+    selected: null
+  };
+}
+
 function App() {
+  const initialNavData = useMemo(() => getInitialNavData(), []);
+  const initialSearch = useMemo(() => getInitialSearchConfig(), []);
+
   // --- State ---
-  const [links, setLinks] = useState<LinkItem[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [links, setLinks] = useState<LinkItem[]>(initialNavData.links);
+  const [categories, setCategories] = useState<Category[]>(initialNavData.categories);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Search Mode State
-  const [searchMode, setSearchMode] = useState<SearchMode>('external');
-  const [externalSearchSources, setExternalSearchSources] = useState<ExternalSearchSource[]>(DEFAULT_SEARCH_SOURCES);
-  const [isLoadingSearchConfig, setIsLoadingSearchConfig] = useState(true);
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialSearch.mode);
+  const [externalSearchSources, setExternalSearchSources] = useState<ExternalSearchSource[]>(initialSearch.sources);
+  const [selectedSearchSource, setSelectedSearchSource] = useState<ExternalSearchSource | null>(initialSearch.selected || DEFAULT_SEARCH_SOURCES[0]);
+  const [isLoadingSearchConfig, setIsLoadingSearchConfig] = useState(false);
   
   // Category Security State
   const [unlockedCategoryIds, setUnlockedCategoryIds] = useState<Set<string>>(new Set());
@@ -410,36 +458,40 @@ function App() {
     closeContextMenu();
   };
 
-  // 加载链接图标缓存
+  // 加载链接图标缓存（极速轻量化，读取本地缓存优先，避免新标签页高频并发请求）
   const loadLinkIcons = async (linksToLoad: LinkItem[]) => {
-    if (!authToken) return; // 只有在已登录状态下才加载图标缓存
+    if (!authToken) return;
     
-    const updatedLinks = [...linksToLoad];
+    let localFavicons: Record<string, string> = {};
+    try {
+      const cached = localStorage.getItem(FAVICON_CACHE_KEY);
+      if (cached) localFavicons = JSON.parse(cached);
+    } catch (e) {}
+
     const domainsToFetch: string[] = [];
-    
-    // 收集所有链接的域名（包括已有图标的链接）
-    for (const link of updatedLinks) {
-      if (link.url) {
-        try {
-          let domain = link.url;
-          if (!link.url.startsWith('http://') && !link.url.startsWith('https://')) {
-            domain = 'https://' + link.url;
-          }
-          
-          if (domain.startsWith('http://') || domain.startsWith('https://')) {
-            const urlObj = new URL(domain);
-            domain = urlObj.hostname;
-            domainsToFetch.push(domain);
-          }
-        } catch (e) {
-          console.error("Failed to parse URL for icon loading", e);
+    for (const link of linksToLoad) {
+      if (!link.url) continue;
+      try {
+        let domain = link.url;
+        if (!link.url.startsWith('http://') && !link.url.startsWith('https://')) {
+          domain = 'https://' + link.url;
         }
-      }
+        const hostname = new URL(domain).hostname;
+        if (localFavicons[hostname] || (link.icon && !link.icon.includes('gstatic.cn'))) {
+          continue;
+        }
+        if (!domainsToFetch.includes(hostname)) {
+          domainsToFetch.push(hostname);
+        }
+      } catch (e) {}
     }
-    
-    // 批量获取图标
-    if (domainsToFetch.length > 0) {
-      const iconPromises = domainsToFetch.map(async (domain) => {
+
+    if (domainsToFetch.length === 0) return;
+
+    // 限制单次最多异步查询 8 个域名，不阻塞关键网络
+    const toQuery = domainsToFetch.slice(0, 8);
+    const results = await Promise.allSettled(
+      toQuery.map(async (domain) => {
         try {
           const response = await fetch(`/api/storage?getConfig=favicon&domain=${encodeURIComponent(domain)}`);
           if (response.ok) {
@@ -448,48 +500,23 @@ function App() {
               return { domain, icon: data.icon };
             }
           }
-        } catch (error) {
-          console.log(`Failed to fetch cached icon for ${domain}`, error);
-        }
+        } catch (e) {}
         return null;
-      });
-      
-      const iconResults = await Promise.all(iconPromises);
-      
-      // 更新链接的图标
-      iconResults.forEach(result => {
-        if (result) {
-          const linkToUpdate = updatedLinks.find(link => {
-            if (!link.url) return false;
-            try {
-              let domain = link.url;
-              if (!link.url.startsWith('http://') && !link.url.startsWith('https://')) {
-                domain = 'https://' + link.url;
-              }
-              
-              if (domain.startsWith('http://') || domain.startsWith('https://')) {
-                const urlObj = new URL(domain);
-                return urlObj.hostname === result.domain;
-              }
-            } catch (e) {
-              return false;
-            }
-            return false;
-          });
-          
-          if (linkToUpdate) {
-            // 只有当链接没有图标，或者当前图标是 gstatic.cn 生成的，或者缓存中的图标是自定义图标时才更新
-            if (!linkToUpdate.icon || 
-                linkToUpdate.icon.includes('gstatic.cn') || 
-                !result.icon.includes('gstatic.cn')) {
-              linkToUpdate.icon = result.icon;
-            }
-          }
-        }
-      });
-      
-      // 更新状态
-      setLinks(updatedLinks);
+      })
+    );
+
+    let updated = false;
+    results.forEach((res) => {
+      if (res.status === 'fulfilled' && res.value) {
+        localFavicons[res.value.domain] = res.value.icon;
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      try {
+        localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(localFavicons));
+      } catch (e) {}
     }
   };
 
@@ -519,7 +546,7 @@ function App() {
         if (expiryTimeMs > 0 && timeDiff > expiryTimeMs) {
           localStorage.removeItem(AUTH_KEY);
           localStorage.removeItem('lastLoginTime');
-          setAuthToken(null);
+          setAuthToken('');
         } else {
           setAuthToken(savedToken);
         }
@@ -541,201 +568,90 @@ function App() {
     const addUrl = urlParams.get('add_url');
     if (addUrl) {
         const addTitle = urlParams.get('add_title') || '';
-        // Clean URL params to avoid re-triggering on refresh
         window.history.replaceState({}, '', window.location.pathname);
         
         setPrefillLink({
             title: addTitle,
             url: addUrl,
-            categoryId: 'common' // Default, Modal will handle selection
+            categoryId: 'common'
         });
         setEditingLink(undefined);
         setIsModalOpen(true);
     }
 
-    // Initial Data Fetch
+    // Initial Data Fetch (采用单次聚合请求优化，快速后台同步，不阻塞首屏渲染)
     const initData = async () => {
-        // 首先检查是否需要认证
-        try {
-            const authRes = await fetch('/api/storage?checkAuth=true');
-            if (authRes.ok) {
-                const authData = await authRes.json();
-                setRequiresAuth(authData.requiresAuth);
-                
-                // 如果需要认证但用户未登录，则不获取数据
-                if (authData.requiresAuth && !savedToken) {
-                    setIsCheckingAuth(false);
-                    setIsAuthOpen(true);
-                    return;
-                }
-            }
-        } catch (e) {
-            console.warn("Failed to check auth requirement.", e);
-        }
-        
-        // 获取数据
-        let hasCloudData = false;
-        try {
-            const tokenToUse = authToken || localStorage.getItem(AUTH_KEY) || savedToken;
-            const res = await fetch('/api/storage', {
-                headers: tokenToUse ? { 'x-auth-password': tokenToUse } : {}
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.links && data.links.length > 0) {
-                    setLinks(data.links);
-                    setCategories(data.categories || DEFAULT_CATEGORIES);
-                    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-                    
-                    // 加载链接图标缓存
-                    loadLinkIcons(data.links);
-                    hasCloudData = true;
-                }
-            } else if (res.status === 401) {
-                // 如果返回401（密码被修改或密码过期），清除本地旧token并弹出登录框
-                setAuthToken('');
-                localStorage.removeItem(AUTH_KEY);
-                localStorage.removeItem('lastLoginTime');
-                setIsAuthOpen(true);
-                setIsCheckingAuth(false);
-                return;
-            }
-        } catch (e) {
-            console.warn("Failed to fetch from cloud, falling back to local.", e);
-        }
-        
-        // 无论是否有云端数据，都尝试从KV空间加载搜索配置和网站配置
-        try {
-            const searchConfigRes = await fetch('/api/storage?getConfig=search');
-            if (searchConfigRes.ok) {
-                const searchConfigData = await searchConfigRes.json();
-                // 检查搜索配置是否有效（包含必要的字段）
-                if (searchConfigData && (searchConfigData.mode || searchConfigData.externalSources || searchConfigData.selectedSource)) {
-                    setSearchMode(searchConfigData.mode || 'external');
-                    setExternalSearchSources(searchConfigData.externalSources || []);
-                    // 加载已保存的选中搜索源
-                    if (searchConfigData.selectedSource) {
-                        setSelectedSearchSource(searchConfigData.selectedSource);
-                    }
-                }
-            }
-            
-            // 获取网站配置（包括密码过期时间设置）
-            const websiteConfigRes = await fetch('/api/storage?getConfig=website');
-            if (websiteConfigRes.ok) {
-                const websiteConfigData = await websiteConfigRes.json();
-                if (websiteConfigData) {
-                    setSiteSettings(prev => ({
-                        ...prev,
-                        title: websiteConfigData.title || prev.title,
-                        navTitle: websiteConfigData.navTitle || prev.navTitle,
-                        favicon: websiteConfigData.favicon || prev.favicon,
-                        cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                        passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays,
-                        openTarget: websiteConfigData.openTarget || prev.openTarget || '_blank'
-                    }));
-                }
-            }
-        } catch (e) {
-            console.warn("Failed to fetch configs from KV.", e);
-        }
-        
-        // 如果有云端数据，则不需要加载本地数据
-        if (hasCloudData) {
+      const tokenToUse = authToken || localStorage.getItem(AUTH_KEY) || savedToken;
+
+      try {
+        // 1. 尝试使用聚合端点 /api/storage?all=true 一次性获取认证状态、数据与所有配置
+        const res = await fetch('/api/storage?all=true', {
+          headers: tokenToUse ? { 'x-auth-password': tokenToUse } : {}
+        });
+
+        if (res.ok) {
+          const payload = await res.json();
+          setRequiresAuth(payload.requiresAuth);
+
+          if (payload.requiresAuth && !payload.authenticated && !tokenToUse) {
             setIsCheckingAuth(false);
+            setIsAuthOpen(true);
             return;
-        }
-        
-        // 如果没有云端数据，则加载本地数据
-        loadFromLocal();
-        
-        // 如果从KV空间加载搜索配置失败，直接使用默认配置（不使用localStorage回退）
-        setSearchMode('external');
-        setExternalSearchSources([
-            {
-                id: 'bing',
-                name: '必应',
-                url: 'https://www.bing.com/search?q={query}',
-                icon: 'Search',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'google',
-                name: 'Google',
-                url: 'https://www.google.com/search?q={query}',
-                icon: 'Search',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'baidu',
-                name: '百度',
-                url: 'https://www.baidu.com/s?wd={query}',
-                icon: 'Globe',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'sogou',
-                name: '搜狗',
-                url: 'https://www.sogou.com/web?query={query}',
-                icon: 'Globe',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'yandex',
-                name: 'Yandex',
-                url: 'https://yandex.com/search/?text={query}',
-                icon: 'Globe',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'github',
-                name: 'GitHub',
-                url: 'https://github.com/search?q={query}',
-                icon: 'Github',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'linuxdo',
-                name: 'Linux.do',
-                url: 'https://linux.do/search?q={query}',
-                icon: 'Terminal',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'bilibili',
-                name: 'B站',
-                url: 'https://search.bilibili.com/all?keyword={query}',
-                icon: 'Play',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'youtube',
-                name: 'YouTube',
-                url: 'https://www.youtube.com/results?search_query={query}',
-                icon: 'Video',
-                enabled: true,
-                createdAt: Date.now()
-            },
-            {
-                id: 'wikipedia',
-                name: '维基',
-                url: 'https://zh.wikipedia.org/wiki/Special:Search?search={query}',
-                icon: 'BookOpen',
-                enabled: true,
-                createdAt: Date.now()
+          }
+
+          if (payload.data && payload.data.links && payload.data.links.length > 0) {
+            setLinks(payload.data.links);
+            setCategories(payload.data.categories || DEFAULT_CATEGORIES);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload.data));
+            loadLinkIcons(payload.data.links);
+          }
+
+          if (payload.searchConfig) {
+            const sc = payload.searchConfig;
+            if (sc.mode || sc.externalSources || sc.selectedSource) {
+              if (sc.mode) setSearchMode(sc.mode);
+              if (sc.externalSources) setExternalSearchSources(sc.externalSources);
+              if (sc.selectedSource) setSelectedSearchSource(sc.selectedSource);
+              localStorage.setItem(SEARCH_CONFIG_KEY, JSON.stringify(sc));
             }
-        ]);
-        
-        setIsLoadingSearchConfig(false);
-        setIsCheckingAuth(false);
+          }
+
+          if (payload.websiteConfig) {
+            const wc = payload.websiteConfig;
+            setSiteSettings(prev => {
+              const updated = {
+                ...prev,
+                title: wc.title || prev.title,
+                navTitle: wc.navTitle || prev.navTitle,
+                favicon: wc.favicon || prev.favicon,
+                cardStyle: wc.cardStyle || prev.cardStyle,
+                passwordExpiryDays: wc.passwordExpiryDays !== undefined ? wc.passwordExpiryDays : prev.passwordExpiryDays,
+                openTarget: wc.openTarget || prev.openTarget || '_blank'
+              };
+              localStorage.setItem('cloudnav_site_settings', JSON.stringify(updated));
+              return updated;
+            });
+          }
+
+          setIsCheckingAuth(false);
+          setIsLoadingSearchConfig(false);
+          return;
+        } else if (res.status === 401) {
+          setAuthToken('');
+          localStorage.removeItem(AUTH_KEY);
+          localStorage.removeItem('lastLoginTime');
+          setIsAuthOpen(true);
+          setIsCheckingAuth(false);
+          return;
+        }
+      } catch (e) {
+        console.warn("Unified initData failed, using local cache.", e);
+      }
+
+      // 如果聚合请求不可用，从本地缓存加载并解除 loading 状态
+      loadFromLocal();
+      setIsCheckingAuth(false);
+      setIsLoadingSearchConfig(false);
     };
 
     initData();
@@ -1137,7 +1053,7 @@ function App() {
       
       if (activeIndex !== -1 && overIndex !== -1) {
         // 重新排序当前分类的链接
-        const reorderedCategoryLinks = arrayMove(categoryLinks, activeIndex, overIndex);
+        const reorderedCategoryLinks = arrayMove<LinkItem>(categoryLinks, activeIndex, overIndex);
         
         // 更新所有链接的顺序
         const updatedLinks = links.map(link => {
@@ -1170,7 +1086,7 @@ function App() {
       
       if (activeIndex !== -1 && overIndex !== -1) {
         // 重新排序置顶链接
-        const reorderedPinnedLinks = arrayMove(pinnedLinksList, activeIndex, overIndex);
+        const reorderedPinnedLinks = arrayMove<LinkItem>(pinnedLinksList, activeIndex, overIndex);
         
         // 创建一个映射，存储每个置顶链接的新pinnedOrder
         const pinnedOrderMap = new Map<string, number>();
@@ -1436,7 +1352,6 @@ function App() {
   // 搜索源选择弹出窗口状态
   const [showSearchSourcePopup, setShowSearchSourcePopup] = useState(false);
   const [hoveredSearchSource, setHoveredSearchSource] = useState<ExternalSearchSource | null>(null);
-  const [selectedSearchSource, setSelectedSearchSource] = useState<ExternalSearchSource | null>(DEFAULT_SEARCH_SOURCES[0]);
   const [isIconHovered, setIsIconHovered] = useState(false);
   const [isPopupHovered, setIsPopupHovered] = useState(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1577,7 +1492,10 @@ function App() {
           setSelectedSearchSource(selectedSource);
       }
       
-      // 只保存到KV空间（搜索配置允许无密码访问）
+      // 保存到本地缓存和 KV 空间
+      try {
+        localStorage.setItem(SEARCH_CONFIG_KEY, JSON.stringify(searchConfig));
+      } catch (e) {}
       try {
           const headers: Record<string, string> = {
               'Content-Type': 'application/json'
@@ -1947,7 +1865,7 @@ function App() {
   // --- Render Components ---
 
   // 创建可排序的链接卡片组件
-  const SortableLinkCard = ({ link }: { link: LinkItem }) => {
+  const SortableLinkCard: React.FC<{ link: LinkItem; key?: string }> = ({ link }) => {
     const {
       attributes,
       listeners,
@@ -1991,7 +1909,7 @@ function App() {
               isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
             }`}>
               {link.icon ? (
-                <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               ) : (
                 link.title.charAt(0)
               )}
@@ -2074,7 +1992,7 @@ function App() {
                 isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
                 {link.icon ? (
-                  <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                  <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
                 ) : (
                   link.title.charAt(0)
                 )}
@@ -2141,7 +2059,7 @@ function App() {
                 isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
                 {link.icon ? (
-                  <img src={link.icon} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                  <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
                 ) : (
                   link.title.charAt(0)
                 )}
@@ -2248,11 +2166,13 @@ function App() {
                 此导航页面设置了访问密码，请输入密码以继续访问
               </p>
             </div>
-            <AuthModal 
-              isOpen={true} 
-              onLogin={handleLogin} 
-              defaultRememberForever={siteSettings.passwordExpiryDays === 0}
-            />
+            <React.Suspense fallback={null}>
+              <AuthModal 
+                isOpen={true} 
+                onLogin={handleLogin} 
+                defaultRememberForever={siteSettings.passwordExpiryDays === 0}
+              />
+            </React.Suspense>
           </div>
         </div>
       )}
@@ -2260,69 +2180,85 @@ function App() {
       {/* 主要内容 - 只有在不需要认证或已认证时显示 */}
       {(!requiresAuth || authToken) && (
         <>
-          <AuthModal 
-            isOpen={isAuthOpen} 
-            onLogin={handleLogin} 
-            defaultRememberForever={siteSettings.passwordExpiryDays === 0}
-          />
-      
-      <CategoryAuthModal 
-        isOpen={!!catAuthModalData}
-        category={catAuthModalData}
-        onClose={() => setCatAuthModalData(null)}
-        onUnlock={handleUnlockCategory}
-      />
+          <React.Suspense fallback={null}>
+            {isAuthOpen && (
+              <AuthModal 
+                isOpen={isAuthOpen} 
+                onLogin={handleLogin} 
+                defaultRememberForever={siteSettings.passwordExpiryDays === 0}
+              />
+            )}
+        
+            {!!catAuthModalData && (
+              <CategoryAuthModal 
+                isOpen={!!catAuthModalData}
+                category={catAuthModalData}
+                onClose={() => setCatAuthModalData(null)}
+                onUnlock={handleUnlockCategory}
+              />
+            )}
 
-      <CategoryManagerModal 
-        isOpen={isCatManagerOpen} 
-        onClose={() => setIsCatManagerOpen(false)}
-        categories={categories}
-        onUpdateCategories={handleUpdateCategories}
-        onDeleteCategory={handleDeleteCategory}
-      />
+            {isCatManagerOpen && (
+              <CategoryManagerModal 
+                isOpen={isCatManagerOpen} 
+                onClose={() => setIsCatManagerOpen(false)}
+                categories={categories}
+                onUpdateCategories={handleUpdateCategories}
+                onDeleteCategory={handleDeleteCategory}
+              />
+            )}
 
-      <BackupModal
-        isOpen={isBackupModalOpen}
-        onClose={() => setIsBackupModalOpen(false)}
-        links={links}
-        categories={categories}
-        onRestore={handleRestoreBackup}
-        webDavConfig={webDavConfig}
-        onSaveWebDavConfig={handleSaveWebDavConfig}
-        searchConfig={{ mode: searchMode, externalSources: externalSearchSources }}
-        onRestoreSearchConfig={handleRestoreSearchConfig}
-        aiConfig={aiConfig}
-        onRestoreAIConfig={handleRestoreAIConfig}
-      />
+            {isBackupModalOpen && (
+              <BackupModal
+                isOpen={isBackupModalOpen}
+                onClose={() => setIsBackupModalOpen(false)}
+                links={links}
+                categories={categories}
+                onRestore={handleRestoreBackup}
+                webDavConfig={webDavConfig}
+                onSaveWebDavConfig={handleSaveWebDavConfig}
+                searchConfig={{ mode: searchMode, externalSources: externalSearchSources }}
+                onRestoreSearchConfig={handleRestoreSearchConfig}
+                aiConfig={aiConfig}
+                onRestoreAIConfig={handleRestoreAIConfig}
+              />
+            )}
 
-      <ImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        existingLinks={links}
-        categories={categories}
-        onImport={handleImportConfirm}
-        onImportSearchConfig={handleRestoreSearchConfig}
-        onImportAIConfig={handleRestoreAIConfig}
-      />
+            {isImportModalOpen && (
+              <ImportModal
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                existingLinks={links}
+                categories={categories}
+                onImport={handleImportConfirm}
+                onImportSearchConfig={handleRestoreSearchConfig}
+                onImportAIConfig={handleRestoreAIConfig}
+              />
+            )}
 
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        config={aiConfig}
-        siteSettings={siteSettings}
-        onSave={handleSaveAIConfig}
-        links={links}
-        categories={categories}
-        onUpdateLinks={(newLinks) => updateData(newLinks, categories)}
-        authToken={authToken}
-      />
+            {isSettingsModalOpen && (
+              <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                config={aiConfig}
+                siteSettings={siteSettings}
+                onSave={handleSaveAIConfig}
+                links={links}
+                categories={categories}
+                onUpdateLinks={(newLinks) => updateData(newLinks, categories)}
+                authToken={authToken}
+              />
+            )}
 
-      <SearchConfigModal
-        isOpen={isSearchConfigModalOpen}
-        onClose={() => setIsSearchConfigModalOpen(false)}
-        sources={externalSearchSources}
-        onSave={(sources) => handleSaveSearchConfig(sources, searchMode)}
-      />
+            {isSearchConfigModalOpen && (
+              <SearchConfigModal
+                isOpen={isSearchConfigModalOpen}
+                onClose={() => setIsSearchConfigModalOpen(false)}
+                sources={externalSearchSources}
+                onSave={(sources) => handleSaveSearchConfig(sources, searchMode)}
+              />
+            )}
+          </React.Suspense>
 
       {/* Sidebar Mobile Overlay */}
       {sidebarOpen && (
@@ -2628,6 +2564,8 @@ function App() {
                       <img
                         src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL(source.url).hostname}`}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="w-3.5 h-3.5"
                         onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                       />
@@ -2654,6 +2592,8 @@ function App() {
                       <img 
                         src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL((selectedSearchSource || externalSearchSources.filter(s => s.enabled)[0]).url).hostname}`}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="w-4 h-4"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -3137,38 +3077,44 @@ function App() {
         </div>
       </main>
 
-          <LinkModal
-            isOpen={isModalOpen}
-            onClose={() => { setIsModalOpen(false); setEditingLink(undefined); setPrefillLink(undefined); }}
-            onSave={editingLink ? handleEditLink : handleAddLink}
-            onDelete={editingLink ? handleDeleteLink : undefined}
-            categories={categories}
-            initialData={editingLink || (prefillLink as LinkItem)}
-            aiConfig={aiConfig}
-            defaultCategoryId={selectedCategory !== 'all' ? selectedCategory : undefined}
-          />
+          <React.Suspense fallback={null}>
+            {isModalOpen && (
+              <LinkModal
+                isOpen={isModalOpen}
+                onClose={() => { setIsModalOpen(false); setEditingLink(undefined); setPrefillLink(undefined); }}
+                onSave={editingLink ? handleEditLink : handleAddLink}
+                onDelete={editingLink ? handleDeleteLink : undefined}
+                categories={categories}
+                initialData={editingLink || (prefillLink as LinkItem)}
+                aiConfig={aiConfig}
+                defaultCategoryId={selectedCategory !== 'all' ? selectedCategory : undefined}
+              />
+            )}
 
-          {/* 右键菜单 */}
-          <ContextMenu
-            isOpen={contextMenu.isOpen}
-            position={contextMenu.position}
-            onClose={closeContextMenu}
-            onCopyLink={copyLinkToClipboard}
-            onShowQRCode={showQRCode}
-            onEditLink={editLinkFromContextMenu}
-            onDeleteLink={deleteLinkFromContextMenu}
-            onTogglePin={togglePinFromContextMenu}
-            currentEmoji={contextMenu.link?.emoji}
-            onSetEmoji={setEmojiFromContextMenu}
-          />
+            {/* 右键菜单 */}
+            <ContextMenu
+              isOpen={contextMenu.isOpen}
+              position={contextMenu.position}
+              onClose={closeContextMenu}
+              onCopyLink={copyLinkToClipboard}
+              onShowQRCode={showQRCode}
+              onEditLink={editLinkFromContextMenu}
+              onDeleteLink={deleteLinkFromContextMenu}
+              onTogglePin={togglePinFromContextMenu}
+              currentEmoji={contextMenu.link?.emoji}
+              onSetEmoji={setEmojiFromContextMenu}
+            />
 
-          {/* 二维码模态框 */}
-          <QRCodeModal
-            isOpen={qrCodeModal.isOpen}
-            url={qrCodeModal.url || ''}
-            title={qrCodeModal.title || ''}
-            onClose={() => setQrCodeModal({ isOpen: false, url: '', title: '' })}
-          />
+            {/* 二维码模态框 */}
+            {qrCodeModal.isOpen && (
+              <QRCodeModal
+                isOpen={qrCodeModal.isOpen}
+                url={qrCodeModal.url || ''}
+                title={qrCodeModal.title || ''}
+                onClose={() => setQrCodeModal({ isOpen: false, url: '', title: '' })}
+              />
+            )}
+          </React.Suspense>
         </>
       )}
     </div>

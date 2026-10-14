@@ -26,6 +26,52 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
     const checkAuth = url.searchParams.get('checkAuth');
     const getConfig = url.searchParams.get('getConfig');
     
+    // 如果是获取全量初始化数据（聚合请求，极大提升首屏和新标签页加载速度）
+    if (url.searchParams.get('all') === 'true') {
+      const serverPassword = env.PASSWORD;
+      const requiresAuth = !!serverPassword;
+      const providedPassword = request.headers.get('x-auth-password');
+
+      // 并行从 KV 读取配置和数据
+      const [dataStr, searchConfigStr, websiteConfigStr] = await Promise.all([
+        env.CLOUDNAV_KV.get('app_data'),
+        env.CLOUDNAV_KV.get('search_config'),
+        env.CLOUDNAV_KV.get('website_config'),
+      ]);
+
+      let parsedSearch = null;
+      let parsedWebsite = null;
+      let parsedData = null;
+
+      try { if (searchConfigStr) parsedSearch = JSON.parse(searchConfigStr); } catch (e) {}
+      try { if (websiteConfigStr) parsedWebsite = JSON.parse(websiteConfigStr); } catch (e) {}
+      try { if (dataStr) parsedData = JSON.parse(dataStr); } catch (e) {}
+
+      // 如果需要密码且密码未提供或不正确
+      if (requiresAuth && (!providedPassword || providedPassword !== serverPassword)) {
+        return new Response(JSON.stringify({
+          hasPassword: true,
+          requiresAuth: true,
+          authenticated: false,
+          searchConfig: parsedSearch,
+          websiteConfig: parsedWebsite || { passwordExpiryDays: 7 },
+        }), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        hasPassword: !!serverPassword,
+        requiresAuth: !!serverPassword,
+        authenticated: true,
+        data: parsedData,
+        searchConfig: parsedSearch,
+        websiteConfig: parsedWebsite || { passwordExpiryDays: 7 },
+      }), {
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
     // 如果是检查认证请求，返回是否设置了密码
     if (checkAuth === 'true') {
       const serverPassword = env.PASSWORD;
@@ -36,7 +82,7 @@ export const onRequestGet = async (context: { env: Env; request: Request }) => {
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
-    
+
     // 如果是获取配置请求
     if (getConfig === 'ai') {
       const aiConfig = await env.CLOUDNAV_KV.get('ai_config');

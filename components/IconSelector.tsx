@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import * as LucideIcons from 'lucide-react';
 import { X, Search, ExternalLink } from 'lucide-react';
 import Icon from './Icon';
 
@@ -25,7 +24,8 @@ const commonIcons = [
   'Rocket', 'Plane', 'Car', 'Bike', 'Ship', 'Train',
   'Moon', 'Sun', 'CloudRain', 'CloudSnow', 'Wind', 'Thermometer',
   'Github', 'Gitlab', 'Chrome', 'Firefox', 'Safari', 'Edge',
-  'MessageSquare', 'MessageCircle', 'Send', 'AtSign', 'Percent'
+  'MessageSquare', 'MessageCircle', 'Send', 'AtSign', 'Percent',
+  'Newspaper', 'Palette', 'Gamepad2', 'Bot', 'LayoutGrid'
 ];
 
 const IconSelector: React.FC<IconSelectorProps> = ({ 
@@ -57,27 +57,13 @@ const IconSelector: React.FC<IconSelectorProps> = ({
   // 验证图标名称是否有效
   const validateIconName = (iconName: string): boolean => {
     if (!iconName.trim()) return false;
-    
-    // 检查是否是常用图标列表中的图标
-    if (commonIcons.includes(iconName)) return true;
-    
-    // 检查是否是 Lucide 图标库中的图标
-    try {
-      // 首先尝试直接匹配
-      if (iconName in LucideIcons) return true;
-      
-      // 如果包含连字符，尝试转换为 PascalCase
-      if (iconName.includes('-')) {
-        const pascalName = kebabToPascal(iconName);
-        return pascalName in LucideIcons;
-      }
-      
-      // 尝试首字母大写
-      const capitalizedName = iconName.charAt(0).toUpperCase() + iconName.slice(1);
-      return capitalizedName in LucideIcons;
-    } catch {
-      return false;
+    const clean = iconName.trim();
+    if (commonIcons.some(i => i.toLowerCase() === clean.toLowerCase())) return true;
+    if (clean.includes('-')) {
+      const pascal = kebabToPascal(clean);
+      return commonIcons.some(i => i.toLowerCase() === pascal.toLowerCase());
     }
+    return false;
   };
 
   const handleSelect = (iconName: string) => {

@@ -1,5 +1,43 @@
 import React from 'react';
-import * as LucideIcons from 'lucide-react';
+import {
+  Star, Heart, Bookmark, Flag, Tag, Hash,
+  Home, User, Users, Settings, Bell, Mail,
+  Calendar, Clock, MapPin, Phone, Camera, Image,
+  Folder, File, Archive, Trash2, Download, Upload,
+  Search, Filter, Menu, MoreVertical, ChevronDown, ChevronUp,
+  Plus, Minus, X, Check, AlertCircle, Info,
+  Edit, Copy, Share, Link, ExternalLink, Lock,
+  Code, Terminal, Database, Server, Cloud, Wifi,
+  ShoppingCart, CreditCard, Package, Truck, Store,
+  Music, Play, Pause, Volume2, Headphones, Mic,
+  Book, BookOpen, FileText, PenTool, Highlighter, Type,
+  Layout, Grid, List, Columns, Sidebar, Layers,
+  Circle, Square, Triangle, Hexagon, Zap, Target,
+  Rocket, Plane, Car, Bike, Ship, Train,
+  Moon, Sun, CloudRain, CloudSnow, Wind, Thermometer,
+  Github, Gitlab, Chrome, MessageSquare, MessageCircle, Send, AtSign, Percent,
+  Newspaper, Palette, Gamepad2, Bot, LayoutGrid, LucideIcon
+} from 'lucide-react';
+
+const iconMap: Record<string, LucideIcon> = {
+  Star, Heart, Bookmark, Flag, Tag, Hash,
+  Home, User, Users, Settings, Bell, Mail,
+  Calendar, Clock, MapPin, Phone, Camera, Image,
+  Folder, File, Archive, Trash2, Download, Upload,
+  Search, Filter, Menu, MoreVertical, ChevronDown, ChevronUp,
+  Plus, Minus, X, Check, AlertCircle, Info,
+  Edit, Copy, Share, Link, ExternalLink, Lock,
+  Code, Terminal, Database, Server, Cloud, Wifi,
+  ShoppingCart, CreditCard, Package, Truck, Store,
+  Music, Play, Pause, Volume2, Headphones, Mic,
+  Book, BookOpen, FileText, PenTool, Highlighter, Type,
+  Layout, Grid, List, Columns, Sidebar, Layers,
+  Circle, Square, Triangle, Hexagon, Zap, Target,
+  Rocket, Plane, Car, Bike, Ship, Train,
+  Moon, Sun, CloudRain, CloudSnow, Wind, Thermometer,
+  Github, Gitlab, Chrome, MessageSquare, MessageCircle, Send, AtSign, Percent,
+  Newspaper, Palette, Gamepad2, Bot, LayoutGrid
+};
 
 interface IconProps {
   name: string;
@@ -8,8 +46,7 @@ interface IconProps {
 }
 
 const Icon: React.FC<IconProps> = ({ name, size = 20, className }) => {
-  // @ts-ignore - Dynamic access to Lucide icons
-  const IconComponent = LucideIcons[name] || LucideIcons.Link;
+  const IconComponent = iconMap[name] || iconMap[name?.charAt(0).toUpperCase() + name?.slice(1)] || Link;
   return <IconComponent size={size} className={className} />;
 };
 
