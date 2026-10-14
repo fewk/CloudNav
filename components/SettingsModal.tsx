@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu } from 'lucide-react';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink } from 'lucide-react';
 import { AIConfig, LinkItem, Category, SiteSettings } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
 import JSZip from 'jszip';
@@ -68,7 +68,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       navTitle: siteSettings?.navTitle || 'CloudNav',
       favicon: siteSettings?.favicon || '',
       cardStyle: siteSettings?.cardStyle || 'detailed',
-      passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7
+      passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7,
+      openTarget: siteSettings?.openTarget || '_blank'
   }));
   
   const [generatedIcons, setGeneratedIcons] = useState<string[]>([]);
@@ -98,12 +99,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLocalConfig(config);
-      const safeSettings = {
+      const safeSettings: SiteSettings = {
           title: siteSettings?.title || 'CloudNav - 我的导航',
           navTitle: siteSettings?.navTitle || 'CloudNav',
           favicon: siteSettings?.favicon || '',
           cardStyle: siteSettings?.cardStyle || 'detailed',
-          passwordExpiryDays: siteSettings?.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7
+          passwordExpiryDays: siteSettings?.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7,
+          openTarget: siteSettings?.openTarget || '_blank'
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -128,8 +130,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalSiteSettings(prev => {
         const next = { ...prev, [key]: value };
         
-        // 如果是身份验证过期天数修改，立即保存到 KV 空间
-        if (key === 'passwordExpiryDays' && authToken) {
+        // 如果是身份验证过期天数或打开方式修改，立即保存到 KV 空间
+        if ((key === 'passwordExpiryDays' || key === 'openTarget') && authToken) {
             saveWebsiteConfigToKV(next);
         }
         
@@ -1117,6 +1119,44 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     </div>
                                 </div>
                             </div>
+                            {/* 链接打开方式 */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    链接打开方式
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSiteChange('openTarget', '_blank')}
+                                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
+                                            (localSiteSettings.openTarget || '_blank') === '_blank'
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <ExternalLink size={16} />
+                                        <span>新页面打开</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSiteChange('openTarget', '_self')}
+                                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
+                                            localSiteSettings.openTarget === '_self'
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <Globe size={16} />
+                                        <span>当前页面打开</span>
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {(localSiteSettings.openTarget || '_blank') === '_blank' 
+                                        ? '点击书签卡片时，在新的浏览器标签页中打开站点' 
+                                        : '点击书签卡片时，直接在当前标签页中跳转'}
+                                </p>
+                            </div>
+
                             <div className="space-y-2">
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     身份验证有效期

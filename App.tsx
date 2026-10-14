@@ -102,7 +102,11 @@ function App() {
       const saved = localStorage.getItem('cloudnav_site_settings');
       if (saved) {
           try {
-              return JSON.parse(saved);
+              const parsed = JSON.parse(saved);
+              return {
+                  openTarget: '_blank' as const,
+                  ...parsed
+              };
           } catch (e) {}
       }
       return {
@@ -110,7 +114,8 @@ function App() {
           navTitle: 'CloudNav',
           favicon: '',
           cardStyle: 'detailed' as const,
-          passwordExpiryDays: 7
+          passwordExpiryDays: 7,
+          openTarget: '_blank' as const
       };
   });
   
@@ -626,7 +631,8 @@ function App() {
                         navTitle: websiteConfigData.navTitle || prev.navTitle,
                         favicon: websiteConfigData.favicon || prev.favicon,
                         cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                        passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays
+                        passwordExpiryDays: websiteConfigData.passwordExpiryDays !== undefined ? websiteConfigData.passwordExpiryDays : prev.passwordExpiryDays,
+                        openTarget: websiteConfigData.openTarget || prev.openTarget || '_blank'
                     }));
                 }
             }
@@ -874,7 +880,8 @@ function App() {
                             navTitle: websiteConfigData.navTitle || prev.navTitle,
                             favicon: websiteConfigData.favicon || prev.favicon,
                             cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
-                            passwordExpiryDays: newExpiryDays
+                            passwordExpiryDays: newExpiryDays,
+                            openTarget: websiteConfigData.openTarget || prev.openTarget || '_blank'
                         }));
                     }
                 }
@@ -1511,7 +1518,7 @@ function App() {
     if (searchMode === 'external') {
       const current = selectedSearchSource || externalSearchSources.find(s => s.enabled) || DEFAULT_SEARCH_SOURCES[0];
       const searchUrl = current.url.replace('{query}', encodeURIComponent(searchQuery));
-      window.open(searchUrl, '_blank');
+      window.open(searchUrl, siteSettings.openTarget === '_self' ? '_self' : '_blank');
     }
   };
 
@@ -1785,7 +1792,7 @@ function App() {
               
               // 使用第一个默认搜索源立即执行搜索
               const searchUrl = defaultSources[0].url.replace('{query}', encodeURIComponent(searchQuery));
-              window.open(searchUrl, '_blank');
+              window.open(searchUrl, siteSettings.openTarget === '_self' ? '_self' : '_blank');
               return;
           }
           
@@ -1800,7 +1807,7 @@ function App() {
           
           if (source) {
               const searchUrl = source.url.replace('{query}', encodeURIComponent(searchQuery));
-              window.open(searchUrl, '_blank');
+              window.open(searchUrl, siteSettings.openTarget === '_self' ? '_self' : '_blank');
           }
       }
   };
@@ -2121,8 +2128,8 @@ function App() {
         ) : (
           <a
             href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            target={siteSettings.openTarget === '_self' ? '_self' : '_blank'}
+            rel={siteSettings.openTarget === '_self' ? undefined : "noopener noreferrer"}
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
               isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
             }`}

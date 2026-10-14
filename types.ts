@@ -26,6 +26,7 @@ export interface SiteSettings {
   favicon: string;
   cardStyle: 'detailed' | 'simple';
   passwordExpiryDays: number; // 密码过期天数，0表示永久不退出
+  openTarget?: '_blank' | '_self'; // 链接打开方式：_blank (新页面打开) 或 _self (当前页面打开)
 }
 
 export interface AppState {
