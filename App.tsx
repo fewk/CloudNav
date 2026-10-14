@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
-  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame
+  Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import {
   DndContext,
@@ -112,6 +113,53 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('cloudnav_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleSidebar = () => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(prev => !prev);
+    } else {
+      setIsSidebarCollapsed(prev => {
+        const next = !prev;
+        try {
+          localStorage.setItem('cloudnav_sidebar_collapsed', String(next));
+        } catch {}
+        return next;
+      });
+    }
+  };
+
+  const handleCloseSidebar = () => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    } else {
+      setIsSidebarCollapsed(true);
+      try {
+        localStorage.setItem('cloudnav_sidebar_collapsed', 'true');
+      } catch {}
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
+        e.preventDefault();
+        handleToggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   
   // Search Mode State
   const [searchMode, setSearchMode] = useState<SearchMode>(initialSearch.mode);
@@ -2271,57 +2319,72 @@ function App() {
       {/* Sidebar */}
       <aside 
         className={`
-          fixed lg:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out
-          bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col
+          fixed lg:static inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out
+          bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${isSidebarCollapsed 
+            ? 'lg:-ml-64 lg:w-0 lg:border-r-0 lg:overflow-hidden lg:opacity-0 pointer-events-none lg:pointer-events-none' 
+            : 'w-64 lg:ml-0 lg:w-64 lg:opacity-100'
+          }
         `}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* 品牌专属图标 */}
-            <div className="relative group/logo">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 p-[1.5px] shadow-sm shadow-blue-500/20 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover/logo:scale-105">
-                <div className="w-full h-full rounded-[10px] bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center overflow-hidden">
-                  {siteSettings.favicon ? (
-                    <img 
-                      src={siteSettings.favicon} 
-                      alt="" 
-                      className="w-full h-full object-cover" 
-                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
-                    />
-                  ) : (
-                    <Cloud size={19} className="text-white fill-white/20 stroke-[2.2]" />
-                  )}
+        <div className="w-64 flex flex-col h-full shrink-0">
+          {/* Logo & Close Button */}
+          <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* 品牌专属图标 */}
+              <div className="relative group/logo shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-400 p-[1.5px] shadow-sm shadow-blue-500/20 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover/logo:scale-105">
+                  <div className="w-full h-full rounded-[10px] bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center overflow-hidden">
+                    {siteSettings.favicon ? (
+                      <img 
+                        src={siteSettings.favicon} 
+                        alt="" 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
+                      />
+                    ) : (
+                      <Cloud size={19} className="text-white fill-white/20 stroke-[2.2]" />
+                    )}
+                  </div>
                 </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800" title="服务就绪"></span>
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-800" title="服务就绪"></span>
-            </div>
 
-            {/* 品牌字形与微字幕 (Typography & Subtitle) */}
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1.5 leading-none">
-                {(!siteSettings.navTitle || siteSettings.navTitle === 'CloudNav') ? (
-                  <span className="font-brand font-black text-[19px] tracking-tight flex items-baseline">
-                    <span className="text-slate-800 dark:text-white">Cloud</span>
-                    <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400 bg-clip-text text-transparent ml-0.5">Nav</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 mb-1 animate-pulse"></span>
+              {/* 品牌字形与微字幕 (Typography & Subtitle) */}
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1.5 leading-none">
+                  {(!siteSettings.navTitle || siteSettings.navTitle === 'CloudNav') ? (
+                    <span className="font-brand font-black text-[18px] tracking-tight flex items-baseline">
+                      <span className="text-slate-800 dark:text-white">Cloud</span>
+                      <span className="bg-gradient-to-r from-blue-600 via-indigo-500 to-sky-400 bg-clip-text text-transparent ml-0.5">Nav</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 mb-1 animate-pulse"></span>
+                    </span>
+                  ) : (
+                    <span className="font-brand font-black text-[18px] tracking-tight bg-gradient-to-r from-slate-900 via-blue-700 to-indigo-600 dark:from-white dark:via-blue-300 dark:to-indigo-300 bg-clip-text text-transparent truncate">
+                      {siteSettings.navTitle}
+                    </span>
+                  )}
+                  <span className="text-[9px] font-black tracking-wider px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/60 uppercase select-none shrink-0">
+                    PRO
                   </span>
-                ) : (
-                  <span className="font-brand font-black text-[19px] tracking-tight bg-gradient-to-r from-slate-900 via-blue-700 to-indigo-600 dark:from-white dark:via-blue-300 dark:to-indigo-300 bg-clip-text text-transparent truncate">
-                    {siteSettings.navTitle}
-                  </span>
-                )}
-                <span className="text-[9px] font-black tracking-wider px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200/60 dark:border-blue-700/60 uppercase select-none">
-                  PRO
+                </div>
+                <span className="text-[10px] font-medium text-slate-400 dark:text-slate-400 tracking-wider mt-1 truncate select-none">
+                  云航 · 智能聚合导航
                 </span>
               </div>
-              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-400 tracking-wider mt-1 truncate select-none">
-                云航 · 智能聚合导航
-              </span>
             </div>
+
+            {/* 关闭边栏按钮 (PC端折叠边栏，移动端关闭抽屉) */}
+            <button
+              onClick={handleCloseSidebar}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors shrink-0"
+              title="关闭边栏 (Ctrl+B)"
+            >
+              <PanelLeftClose size={18} className="hidden lg:block" />
+              <X size={18} className="lg:hidden" />
+            </button>
           </div>
-        </div>
 
         {/* Categories List */}
         <div 
@@ -2482,6 +2545,7 @@ function App() {
                </a>
             </div>
         </div>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -2490,12 +2554,26 @@ function App() {
         {/* Header */}
         <header className="h-16 px-4 lg:px-8 flex items-center justify-between bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-3 sm:gap-4 flex-1">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300">
-              <Menu size={24} />
+            {/* 移动端打开边栏按钮 */}
+            <button 
+              onClick={() => setSidebarOpen(true)} 
+              className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              title="打开边栏"
+            >
+              <Menu size={20} />
             </button>
 
-            {/* 移动端展示 Mini Brand */}
-            <div className="lg:hidden flex items-center gap-1.5 select-none shrink-0">
+            {/* 桌面端切换/展开边栏按钮 */}
+            <button
+              onClick={handleToggleSidebar}
+              className="hidden lg:flex items-center justify-center p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              title={isSidebarCollapsed ? "展开边栏 (Ctrl+B)" : "收起边栏 (Ctrl+B)"}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            </button>
+
+            {/* Mini Brand: 移动端一直显示，桌面端在边栏收起时显示 */}
+            <div className={`${isSidebarCollapsed ? 'flex' : 'lg:hidden flex'} items-center gap-2 select-none shrink-0`}>
               <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm overflow-hidden">
                 {siteSettings.favicon ? (
                   <img src={siteSettings.favicon} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
