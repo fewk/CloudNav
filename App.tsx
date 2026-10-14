@@ -2295,6 +2295,15 @@ function App() {
                 onSaveSearchSources={handleSaveSearchSources}
                 onUpdateCategories={handleUpdateCategories}
                 onDeleteCategory={handleDeleteCategory}
+                onImport={handleImportConfirm}
+                onImportSearchConfig={handleRestoreSearchConfig}
+                onImportAIConfig={handleRestoreAIConfig}
+                webDavConfig={webDavConfig}
+                onSaveWebDavConfig={handleSaveWebDavConfig}
+                searchConfig={{ mode: searchMode, externalSources: externalSearchSources }}
+                onRestoreSearchConfig={handleRestoreSearchConfig}
+                onRestoreBackup={handleRestoreBackup}
+                onRestoreAIConfig={handleRestoreAIConfig}
               />
             )}
 
@@ -2496,46 +2505,27 @@ function App() {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
-            
-            <div className="grid grid-cols-3 gap-2 mb-2">
-                <button 
-                    onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsImportModalOpen(true); }}
-                    className="flex flex-col items-center justify-center gap-1 p-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 transition-all"
-                    title="导入书签"
-                >
-                    <Upload size={14} />
-                    <span>导入</span>
-                </button>
-                
-                <button 
-                    onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsBackupModalOpen(true); }}
-                    className="flex flex-col items-center justify-center gap-1 p-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 transition-all"
-                    title="备份与恢复"
-                >
-                    <CloudCog size={14} />
-                    <span>备份</span>
-                </button>
+        <div className="p-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+            <div className="flex items-center justify-between text-xs px-1">
+               <div className="flex items-center gap-1.5">
+                 <button 
+                   onClick={() => setIsSettingsModalOpen(true)}
+                   className="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 rounded-lg transition-all flex items-center justify-center shadow-none hover:shadow-sm"
+                   title="系统设置"
+                   aria-label="系统设置"
+                 >
+                   <Settings size={15} />
+                 </button>
 
-                <button 
-                    onClick={() => setIsSettingsModalOpen(true)}
-                    className="flex flex-col items-center justify-center gap-1 p-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 transition-all"
-                    title="AI 设置"
-                >
-                    <Settings size={14} />
-                    <span>设置</span>
-                </button>
-            </div>
-            
-            <div className="flex items-center justify-between text-xs px-2 mt-2">
-               <div 
-                 className="flex items-center gap-1 text-slate-400 cursor-help"
-                 title={authToken ? "已连接 Cloudflare KV 云端数据库（数据已自动实时同步）" : "未登录，当前为本地离线模式"}
-               >
-                 {syncStatus === 'saving' && <Loader2 className="animate-spin w-3 h-3 text-blue-500" />}
-                 {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                 {syncStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
-                 {authToken ? <span className="text-green-600 dark:text-green-400 font-medium">已同步</span> : <span className="text-amber-500 dark:text-amber-400">离线</span>}
+                 <div 
+                   className="flex items-center gap-1 text-slate-400 cursor-help pl-0.5"
+                   title={authToken ? "已连接 Cloudflare KV 云端数据库（数据已自动实时同步）" : "未登录，当前为本地离线模式"}
+                 >
+                   {syncStatus === 'saving' && <Loader2 className="animate-spin w-3 h-3 text-blue-500" />}
+                   {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                   {syncStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
+                   {authToken ? <span className="text-green-600 dark:text-green-400 font-medium">已同步</span> : <span className="text-amber-500 dark:text-amber-400">离线</span>}
+                 </div>
                </div>
 
                <a 

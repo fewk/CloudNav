@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw, FolderTree } from 'lucide-react';
-import { AIConfig, LinkItem, Category, SiteSettings, ExternalSearchSource } from '../types';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw, FolderTree, Upload, CloudCog } from 'lucide-react';
+import { AIConfig, LinkItem, Category, SiteSettings, ExternalSearchSource, WebDavConfig, SearchConfig } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
 import CategoryManagerView from './CategoryManagerView';
+import ImportView from './ImportView';
+import BackupView from './BackupView';
 import { APP_VERSION } from '../version';
 import JSZip from 'jszip';
 
@@ -21,6 +23,15 @@ interface SettingsModalProps {
   onUpdateCategories?: (categories: Category[]) => void;
   onDeleteCategory?: (id: string, mode: 'migrate' | 'delete_all', targetId?: string) => void;
   onVerifyPassword?: (password: string) => Promise<boolean>;
+  onImport?: (newLinks: LinkItem[], newCategories: Category[]) => void;
+  onImportSearchConfig?: (searchConfig: SearchConfig) => void;
+  onImportAIConfig?: (aiConfig: AIConfig) => void;
+  webDavConfig?: WebDavConfig;
+  onSaveWebDavConfig?: (config: WebDavConfig) => void;
+  searchConfig?: SearchConfig;
+  onRestoreSearchConfig?: (searchConfig: SearchConfig) => void;
+  onRestoreBackup?: (links: LinkItem[], categories: Category[]) => void;
+  onRestoreAIConfig?: (aiConfig: AIConfig) => void;
 }
 
 const getRandomColor = () => {
@@ -75,9 +86,11 @@ const getFaviconUrl = (urlStr: string) => {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
     isOpen, onClose, config, siteSettings, onSave, links, categories, onUpdateLinks, authToken,
-    externalSearchSources, onSaveSearchSources, onUpdateCategories, onDeleteCategory, onVerifyPassword
+    externalSearchSources, onSaveSearchSources, onUpdateCategories, onDeleteCategory, onVerifyPassword,
+    onImport, onImportSearchConfig, onImportAIConfig,
+    webDavConfig, onSaveWebDavConfig, searchConfig, onRestoreSearchConfig, onRestoreBackup, onRestoreAIConfig
 }) => {
-  const [activeTab, setActiveTab] = useState<'site' | 'category' | 'search' | 'ai' | 'tools'>('site');
+  const [activeTab, setActiveTab] = useState<'site' | 'category' | 'search' | 'import' | 'backup' | 'ai' | 'tools'>('site');
   const [localConfig, setLocalConfig] = useState<AIConfig>(config);
   
   const [localSearchSources, setLocalSearchSources] = useState<ExternalSearchSource[]>(externalSearchSources || []);
@@ -1112,6 +1125,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     { id: 'site', label: '网站设置', icon: LayoutTemplate },
     { id: 'category', label: '分类管理', icon: FolderTree },
     { id: 'search', label: '搜索引擎', icon: Search },
+    { id: 'import', label: '书签导入', icon: Upload },
+    { id: 'backup', label: '数据备份', icon: CloudCog },
     { id: 'ai', label: 'AI 设置', icon: Bot },
     { id: 'tools', label: '扩展工具', icon: Wrench },
   ];
@@ -1487,6 +1502,36 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                 )}
 
+                {activeTab === 'import' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <ImportView
+                            existingLinks={links}
+                            categories={categories}
+                            onImport={onImport || (() => {})}
+                            onImportSearchConfig={onImportSearchConfig}
+                            onImportAIConfig={onImportAIConfig}
+                            authToken={authToken}
+                        />
+                    </div>
+                )}
+
+                {activeTab === 'backup' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <BackupView
+                            links={links}
+                            categories={categories}
+                            onRestore={onRestoreBackup || (() => {})}
+                            webDavConfig={webDavConfig || { enabled: false, url: '', username: '', password: '' }}
+                            onSaveWebDavConfig={onSaveWebDavConfig || (() => {})}
+                            searchConfig={searchConfig || { mode: 'instant', externalSources: [] }}
+                            onRestoreSearchConfig={onRestoreSearchConfig || (() => {})}
+                            aiConfig={localConfig}
+                            onRestoreAIConfig={onRestoreAIConfig || (() => {})}
+                            authToken={authToken}
+                        />
+                    </div>
+                )}
+
                 {activeTab === 'ai' && (
                     <div className="space-y-6 animate-in fade-in duration-300">
                         <div>
@@ -1715,13 +1760,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             </div>
 
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end bg-slate-50 dark:bg-slate-800/50 shrink-0">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800/50 shrink-0">
                 <button 
-                    onClick={handleSave}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/20"
+                    onClick={onClose}
+                    className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
                 >
-                    <Save size={18} /> 保存更改
+                    关闭
                 </button>
+                {['site', 'search', 'ai'].includes(activeTab) && (
+                    <button 
+                        onClick={handleSave}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm shadow-blue-500/20"
+                    >
+                        <Save size={16} /> 保存更改
+                    </button>
+                )}
             </div>
         </div>
       </div>
