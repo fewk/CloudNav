@@ -38,6 +38,7 @@ const ImportModal = React.lazy(() => import('./components/ImportModal'));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
 const SearchConfigModal = React.lazy(() => import('./components/SearchConfigModal'));
 const QRCodeModal = React.lazy(() => import('./components/QRCodeModal'));
+import { APP_VERSION } from './version';
 
 // --- 配置项 ---
 // 项目核心仓库地址
@@ -2244,6 +2245,8 @@ function App() {
                 authToken={authToken}
                 externalSearchSources={externalSearchSources}
                 onSaveSearchSources={handleSaveSearchSources}
+                onUpdateCategories={handleUpdateCategories}
+                onDeleteCategory={handleDeleteCategory}
               />
             )}
 
@@ -2340,17 +2343,6 @@ function App() {
                 <span className="truncate flex-1 text-left text-sm font-medium">热门推荐</span>
                 {activeSection === 'pinned' && !searchQuery && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
               </button>
-            </div>
-            
-            <div className="flex items-center justify-between pt-4 pb-2 px-8">
-               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">分类目录</span>
-               <button 
-                  onClick={() => { if(!authToken) setIsAuthOpen(true); else setIsCatManagerOpen(true); }}
-                  className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
-                  title="管理分类"
-               >
-                  <Settings size={14} />
-               </button>
             </div>
 
             {categories.filter(c => !c.parentId).map(cat => {
@@ -2486,7 +2478,7 @@ function App() {
                  title="fewk/CloudNav 开源仓库"
                >
                  <Github size={14} />
-                 <span>CloudNav v1.8.2</span>
+                 <span>CloudNav {APP_VERSION}</span>
                </a>
             </div>
         </div>

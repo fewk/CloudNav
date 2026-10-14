@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw, FolderTree } from 'lucide-react';
 import { AIConfig, LinkItem, Category, SiteSettings, ExternalSearchSource } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
+import CategoryManagerView from './CategoryManagerView';
+import { APP_VERSION } from '../version';
 import JSZip from 'jszip';
 
 interface SettingsModalProps {
@@ -16,6 +18,9 @@ interface SettingsModalProps {
   authToken: string | null;
   externalSearchSources?: ExternalSearchSource[];
   onSaveSearchSources?: (sources: ExternalSearchSource[]) => void;
+  onUpdateCategories?: (categories: Category[]) => void;
+  onDeleteCategory?: (id: string, mode: 'migrate' | 'delete_all', targetId?: string) => void;
+  onVerifyPassword?: (password: string) => Promise<boolean>;
 }
 
 const getRandomColor = () => {
@@ -70,9 +75,9 @@ const getFaviconUrl = (urlStr: string) => {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
     isOpen, onClose, config, siteSettings, onSave, links, categories, onUpdateLinks, authToken,
-    externalSearchSources, onSaveSearchSources
+    externalSearchSources, onSaveSearchSources, onUpdateCategories, onDeleteCategory, onVerifyPassword
 }) => {
-  const [activeTab, setActiveTab] = useState<'site' | 'search' | 'ai' | 'tools'>('site');
+  const [activeTab, setActiveTab] = useState<'site' | 'category' | 'search' | 'ai' | 'tools'>('site');
   const [localConfig, setLocalConfig] = useState<AIConfig>(config);
   
   const [localSearchSources, setLocalSearchSources] = useState<ExternalSearchSource[]>(externalSearchSources || []);
@@ -1105,6 +1110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const tabs = [
     { id: 'site', label: '网站设置', icon: LayoutTemplate },
+    { id: 'category', label: '分类管理', icon: FolderTree },
     { id: 'search', label: '搜索引擎', icon: Search },
     { id: 'ai', label: 'AI 设置', icon: Bot },
     { id: 'tools', label: '扩展工具', icon: Wrench },
@@ -1139,7 +1145,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-white dark:bg-slate-800">
              <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
-                <h3 className="text-lg font-semibold dark:text-white">设置</h3>
+                <h3 className="text-lg font-semibold dark:text-white flex items-center gap-2">
+                    设置 
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-normal font-mono">
+                        {APP_VERSION}
+                    </span>
+                </h3>
                 <button onClick={onClose} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
                     <X className="w-5 h-5 dark:text-slate-400" />
                 </button>
@@ -1332,6 +1343,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 </p>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'category' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <CategoryManagerView
+                            categories={categories}
+                            onUpdateCategories={onUpdateCategories || (() => {})}
+                            onDeleteCategory={onDeleteCategory || (() => {})}
+                            onVerifyPassword={onVerifyPassword}
+                        />
                     </div>
                 )}
 
