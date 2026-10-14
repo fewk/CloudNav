@@ -1531,6 +1531,10 @@ function App() {
       }
   };
 
+  const handleSaveSearchSources = (sources: ExternalSearchSource[]) => {
+      handleSaveSearchConfig(sources, searchMode);
+  };
+
   const handleSearchModeChange = (mode: SearchMode) => {
       setSearchMode(mode);
       

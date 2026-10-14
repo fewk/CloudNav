@@ -59,6 +59,15 @@ const generateSvgIcon = (text: string, color1: string, color2: string) => {
     }
 };
 
+const getFaviconUrl = (urlStr: string) => {
+    try {
+        const parsed = new URL(urlStr.startsWith('http') ? urlStr : `https://${urlStr}`);
+        return `https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${parsed.hostname}`;
+    } catch {
+        return '';
+    }
+};
+
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
     isOpen, onClose, config, siteSettings, onSave, links, categories, onUpdateLinks, authToken,
     externalSearchSources, onSaveSearchSources
@@ -1404,12 +1413,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                                                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                                                     title={source.enabled ? "点击禁用" : "点击启用"}
                                                 />
-                                                <img
-                                                    src={`https://t3.gstatic.cn/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://${new URL(source.url).hostname}`}
-                                                    alt=""
-                                                    className="w-4 h-4 shrink-0"
-                                                    onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                                                />
+                                                {getFaviconUrl(source.url) ? (
+                                                    <img
+                                                        src={getFaviconUrl(source.url)}
+                                                        alt=""
+                                                        className="w-4 h-4 shrink-0"
+                                                        onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                                                    />
+                                                ) : (
+                                                    <Globe size={16} className="text-slate-400 shrink-0" />
+                                                )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-semibold text-sm dark:text-white truncate">{source.name}</span>

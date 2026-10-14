@@ -37,6 +37,18 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [isIconSelectorOpen, setIsIconSelectorOpen] = useState(false);
   const [iconSelectorTarget, setIconSelectorTarget] = useState<'edit' | 'new' | null>(null);
 
+  // 分类操作验证相关状态
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{
+    type: 'edit' | 'delete';
+    categoryId: string;
+    categoryName: string;
+  } | null>(null);
+
+  // 删除确认弹窗状态
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+
   // ESC 键自动关闭窗口
   useEffect(() => {
     if (!isOpen) return;
@@ -56,18 +68,6 @@ const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isIconSelectorOpen, isAuthModalOpen, isDeleteModalOpen, onClose]);
-  
-  // 分类操作验证相关状态
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{
-    type: 'edit' | 'delete';
-    categoryId: string;
-    categoryName: string;
-  } | null>(null);
-
-  // 删除确认弹窗状态
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
 
   if (!isOpen) return null;
 
