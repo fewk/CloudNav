@@ -1,13 +1,16 @@
 {
   "name": "cloudnav-(云航)",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && wrangler pages deploy dist --project-name cloudnav --branch main"
+    "deploy": "vite build && wrangler pages deploy dist --project-name cloudnav --branch main",
+    "bump:patch": "node scripts/bump.js patch",
+    "bump:minor": "node scripts/bump.js minor",
+    "bump:major": "node scripts/bump.js major"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

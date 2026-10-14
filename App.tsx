@@ -39,7 +39,7 @@ const ImportModal = React.lazy(() => import('./components/ImportModal'));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
 const SearchConfigModal = React.lazy(() => import('./components/SearchConfigModal'));
 const QRCodeModal = React.lazy(() => import('./components/QRCodeModal'));
-import { APP_VERSION } from './version';
+import { APP_VERSION, BUILD_TIME } from './version';
 
 // --- 配置项 ---
 // 项目核心仓库地址
@@ -2543,7 +2543,7 @@ function App() {
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="flex items-center gap-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                 title="fewk/CloudNav 开源仓库"
+                 title={`fewk/CloudNav 开源仓库 (${APP_VERSION}${BUILD_TIME ? ` · 构建于 ${BUILD_TIME}` : ''})`}
                >
                  <Github size={14} />
                  <span>CloudNav {APP_VERSION}</span>

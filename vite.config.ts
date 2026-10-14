@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         '__APP_VERSION__': JSON.stringify(pkg.version),
+        '__BUILD_TIME__': JSON.stringify(new Date().toISOString().replace('T', ' ').slice(0, 16)),
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
       },
