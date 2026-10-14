@@ -2568,14 +2568,16 @@ function App() {
               <Menu size={20} />
             </button>
 
-            {/* 桌面端切换/展开边栏按钮 */}
-            <button
-              onClick={handleToggleSidebar}
-              className="hidden lg:flex items-center justify-center p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              title={isSidebarCollapsed ? "展开边栏 (Ctrl+B)" : "收起边栏 (Ctrl+B)"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
-            </button>
+            {/* 桌面端展开边栏按钮：仅在边栏收起时显示，确保界面上始终只有一个开关图标 */}
+            {isSidebarCollapsed && (
+              <button
+                onClick={handleToggleSidebar}
+                className="hidden lg:flex items-center justify-center p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                title="展开边栏 (Ctrl+B)"
+              >
+                <PanelLeftOpen size={20} />
+              </button>
+            )}
 
             {/* Mini Brand: 移动端一直显示，桌面端在边栏收起时显示 */}
             <div className={`${isSidebarCollapsed ? 'flex' : 'lg:hidden flex'} items-center gap-2 select-none shrink-0`}>
