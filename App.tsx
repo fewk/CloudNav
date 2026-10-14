@@ -2319,16 +2319,21 @@ function App() {
       {/* Sidebar */}
       <aside 
         className={`
-          fixed lg:static inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out
-          bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0
+          fixed lg:static inset-y-0 left-0 z-50
+          bg-white dark:bg-slate-800 flex flex-col shrink-0
+          transition-all duration-300 ease-in-out overflow-hidden
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           ${isSidebarCollapsed 
-            ? 'lg:-ml-64 lg:w-0 lg:border-r-0 lg:overflow-hidden lg:opacity-0 pointer-events-none lg:pointer-events-none' 
-            : 'w-64 lg:ml-0 lg:w-64 lg:opacity-100'
+            ? 'w-64 lg:w-0 lg:border-r-0 lg:pointer-events-none border-r border-slate-200 dark:border-slate-700' 
+            : 'w-64 lg:w-64 border-r border-slate-200 dark:border-slate-700'
           }
         `}
       >
-        <div className="w-64 flex flex-col h-full shrink-0">
+        <div 
+          className={`w-64 flex flex-col h-full shrink-0 transition-transform duration-300 ease-in-out ${
+            isSidebarCollapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'
+          }`}
+        >
           {/* Logo & Close Button */}
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-700/80 shrink-0 select-none">
             <div className="flex items-center gap-2.5 min-w-0">
