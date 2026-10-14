@@ -41,7 +41,7 @@ const QRCodeModal = React.lazy(() => import('./components/QRCodeModal'));
 
 // --- 配置项 ---
 // 项目核心仓库地址
-const GITHUB_REPO_URL = 'https://github.com/aabacada/CloudNav-abcd';
+const GITHUB_REPO_URL = 'https://github.com/fewk/CloudNav';
 
 const LOCAL_STORAGE_KEY = 'cloudnav_data_cache';
 const FAVICON_CACHE_KEY = 'cloudnav_favicon_cache';
@@ -1885,7 +1885,7 @@ function App() {
     
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
-    const showTags = (siteSettings.showTags === true) && !!link.tags && link.tags.length > 0;
+    const showTags = (siteSettings.showTags === true) && isDetailedView && !!link.tags && link.tags.length > 0;
     const hasExtra = showDesc || (isDetailedView && showTags);
     
     const style = {
@@ -1915,7 +1915,7 @@ function App() {
           isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
         }`}>
           {/* 第一行：图标和标题 */}
-          <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+          <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
             <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
               isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
             }`}>
@@ -1927,7 +1927,9 @@ function App() {
             </div>
             
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis" title={link.title}>
+              <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                isDetailedView ? 'text-[16px]' : 'text-[14px]'
+              }`} title={link.title}>
                 {link.title}
               </h3>
               {link.emoji && (
@@ -1958,18 +1960,6 @@ function App() {
               ))}
             </div>
           )}
-          {!isDetailedView && showTags && (
-            <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-2">
-              {link.tags!.slice(0, 2).map((tag, idx) => (
-                <span
-                  key={idx}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -1987,7 +1977,7 @@ function App() {
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
     const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
-    const showTags = (siteSettings.showTags === true) && !!link.tags && link.tags.length > 0;
+    const showTags = (siteSettings.showTags === true) && isDetailedView && !!link.tags && link.tags.length > 0;
     const hasExtra = showDesc || (isDetailedView && showTags);
     
     return (
@@ -2013,7 +2003,7 @@ function App() {
             isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
           }`}>
             {/* 第一行：图标和标题 */}
-            <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+            <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
               <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
                 isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
@@ -2025,7 +2015,9 @@ function App() {
               </div>
               
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis" title={link.title}>
+                <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
+                  isDetailedView ? 'text-[16px]' : 'text-[14px]'
+                }`} title={link.title}>
                   {link.title}
                 </h3>
                 {link.emoji && (
@@ -2056,18 +2048,6 @@ function App() {
                 ))}
               </div>
             )}
-            {!isDetailedView && showTags && (
-              <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-2">
-                {link.tags!.slice(0, 2).map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <a
@@ -2080,7 +2060,7 @@ function App() {
             title={isDetailedView ? link.url : (showDesc && link.description ? link.description : link.url)}
           >
             {/* 第一行：图标和标题 */}
-            <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
+            <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
               <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
                 isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
               }`}>
@@ -2092,7 +2072,9 @@ function App() {
               </div>
               
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className="text-[16px] font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-[#ff6000] dark:group-hover:text-blue-400 transition-colors" title={link.title}>
+                <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-[#ff6000] dark:group-hover:text-blue-400 transition-colors ${
+                  isDetailedView ? 'text-[16px]' : 'text-[14px]'
+                }`} title={link.title}>
                   {link.title}
                 </h3>
                 {link.emoji && (
@@ -2122,24 +2104,6 @@ function App() {
                       setSearchQuery(tag);
                     }}
                     className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
-                    title={`按标签 #${tag} 筛选`}
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            {!isDetailedView && showTags && (
-              <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-7">
-                {link.tags!.slice(0, 2).map((tag, idx) => (
-                  <span
-                    key={idx}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSearchQuery(tag);
-                    }}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/60 dark:text-slate-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                     title={`按标签 #${tag} 筛选`}
                   >
                     #{tag}
@@ -2497,11 +2461,14 @@ function App() {
             </div>
             
             <div className="flex items-center justify-between text-xs px-2 mt-2">
-               <div className="flex items-center gap-1 text-slate-400">
+               <div 
+                 className="flex items-center gap-1 text-slate-400 cursor-help"
+                 title={authToken ? "已连接 Cloudflare KV 云端数据库（数据已自动实时同步）" : "未登录，当前为本地离线模式"}
+               >
                  {syncStatus === 'saving' && <Loader2 className="animate-spin w-3 h-3 text-blue-500" />}
                  {syncStatus === 'saved' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
                  {syncStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
-                 {authToken ? <span className="text-green-600">已同步</span> : <span className="text-amber-500">离线</span>}
+                 {authToken ? <span className="text-green-600 dark:text-green-400 font-medium">已同步</span> : <span className="text-amber-500 dark:text-amber-400">离线</span>}
                </div>
 
                <a 
@@ -2509,10 +2476,10 @@ function App() {
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="flex items-center gap-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                 title="Fork this project on GitHub"
+                 title="fewk/CloudNav 开源仓库"
                >
-                 <GitFork size={14} />
-                 <span>Fork 项目 v1.8.2</span>
+                 <Github size={14} />
+                 <span>CloudNav v1.8.2</span>
                </a>
             </div>
         </div>
@@ -2739,9 +2706,9 @@ function App() {
         <div ref={contentScrollRef} onScroll={handleContentScroll} className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-10 scroll-smooth">
           
           {/* Hero 大搜索 Banner */}
-          <div className="part-search relative overflow-hidden rounded-[10px] sm:rounded-2xl mb-[30px] bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 shadow-lg text-white flex justify-center items-center min-h-[280px] sm:min-h-[320px]">
+          <div className="part-search relative overflow-hidden rounded-[10px] sm:rounded-2xl mb-[30px] bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 dark:from-slate-900/95 dark:via-slate-800/95 dark:to-slate-900/95 dark:border dark:border-slate-700/60 shadow-lg dark:shadow-2xl text-white flex justify-center items-center min-h-[280px] sm:min-h-[320px]">
             {/* 原来科技感波点网格背景 */}
-            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+            <div className="absolute inset-0 opacity-15 dark:opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
 
             {/* search-main 主搜索核心 */}
             <div className="search-main pt-[36px] sm:pt-[44px] pb-[36px] sm:pb-[48px] px-4 relative text-center w-full max-w-[760px] mx-auto z-10 flex flex-col justify-center">
@@ -2752,7 +2719,7 @@ function App() {
                   <span className="inline-flex items-center">
                     <span>Cloud</span>
                     <span className="text-cyan-300 ml-1">Nav</span>
-                    <span className="hidden sm:inline-block text-[12px] font-bold tracking-wider text-white/90 bg-white/20 px-2.5 py-0.5 rounded-full ml-3 backdrop-blur-sm self-center align-middle font-sans">
+                    <span className="hidden sm:inline-block text-[12px] font-bold tracking-wider text-white/90 bg-white/20 dark:bg-slate-700/60 dark:text-slate-200 px-2.5 py-0.5 rounded-full ml-3 backdrop-blur-sm self-center align-middle font-sans">
                       云航 · 智能聚合
                     </span>
                   </span>
@@ -2766,11 +2733,13 @@ function App() {
                     <span
                       onClick={() => handleSwitchEngine('internal')}
                       className={`item-a block px-[18px] sm:px-[20px] rounded-t-[6px] cursor-pointer transition-colors ${
-                        searchMode === 'internal' ? 'bg-white text-[#000] font-medium' : 'text-white/90 hover:text-white hover:bg-white/10'
+                        searchMode === 'internal'
+                          ? 'bg-white text-[#000] dark:bg-slate-800 dark:text-blue-400 font-semibold'
+                          : 'text-white/90 hover:text-white hover:bg-white/10 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/40'
                       }`}
                       style={{ height: '30px', lineHeight: '30px' }}
                     >
-                      常用
+                      站内
                     </span>
                   </div>
                   {externalSearchSources.filter(s => s.enabled).slice(0, 5).map(source => {
@@ -2783,7 +2752,9 @@ function App() {
                         <span
                           onClick={() => handleSwitchEngine(source)}
                           className={`item-a block px-[18px] sm:px-[20px] rounded-t-[6px] cursor-pointer transition-colors ${
-                            isCur ? 'bg-white text-[#000] font-medium' : 'text-white/90 hover:text-white hover:bg-white/10'
+                            isCur
+                              ? 'bg-white text-[#000] dark:bg-slate-800 dark:text-blue-400 font-semibold'
+                              : 'text-white/90 hover:text-white hover:bg-white/10 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/40'
                           }`}
                           style={{ height: '30px', lineHeight: '30px' }}
                         >
@@ -2810,7 +2781,7 @@ function App() {
                         ? '搜索站内书签、标签或直接输入网址...'
                         : `在 ${selectedSearchSource?.name || '百度'} 搜索内容...`
                     }
-                    className="s block w-full bg-white text-[#3c3c3c] text-[14px] rounded-[6px] border-none outline-none transition-shadow shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+                    className="s block w-full bg-white dark:bg-slate-800 text-[#3c3c3c] dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-[14px] rounded-[6px] border border-transparent dark:border-slate-700/80 outline-none transition-shadow shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-black/40 focus:ring-2 focus:ring-blue-500/20"
                     style={{
                       padding: '14px 145px 14px 20px',
                       boxSizing: 'border-box'
@@ -2819,7 +2790,7 @@ function App() {
                   {searchQuery.trim() && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-[136px] top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                      className="absolute right-[136px] top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-600 dark:text-slate-300 dark:hover:text-white transition-colors"
                       title="清空"
                     >
                       <X size={12} strokeWidth={2.5} />
@@ -2827,13 +2798,10 @@ function App() {
                   )}
                   <button
                     onClick={handleTriggerSearch}
-                    className="s-btn absolute right-0 top-0 h-full text-white text-[14px] sm:text-[15px] font-medium border-none cursor-pointer rounded-r-[6px] transition-colors flex items-center justify-center"
+                    className="s-btn absolute right-0 top-0 h-full text-white text-[14px] sm:text-[15px] font-medium border-none cursor-pointer rounded-r-[6px] transition-colors flex items-center justify-center bg-[#ff6000] hover:bg-[#e65600] dark:bg-orange-600 dark:hover:bg-orange-500"
                     style={{
-                      width: '126px',
-                      backgroundColor: '#ff6000'
+                      width: '126px'
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e65600')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ff6000')}
                   >
                     <span>{submitButtonText}</span>
                   </button>
@@ -2843,9 +2811,6 @@ function App() {
               {/* 热搜关键词 part-search-keywords：强制单行不折行 */}
               {topHotTags.length > 0 && (
                 <div className="search-keywords part-search-keywords flex flex-nowrap whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 text-[12px] text-white overflow-x-auto no-scrollbar max-w-full" style={{ lineHeight: '2.5em' }}>
-                  <span className="shrink-0 inline-block px-2 py-0.5 rounded text-[11px] font-bold text-white mr-1 select-none" style={{ backgroundColor: '#ff6000' }}>
-                    热搜榜
-                  </span>
                   {topHotTags.slice(0, 8).map(tag => (
                     <span
                       key={tag}
@@ -2853,12 +2818,7 @@ function App() {
                         setSearchMode('internal');
                         setSearchQuery(tag);
                       }}
-                      className="item shrink-0 inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white whitespace-nowrap select-none"
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.22)'
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.22)')}
+                      className="item shrink-0 inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white bg-white/20 hover:bg-white/30 dark:bg-slate-800/90 dark:hover:bg-slate-700 dark:text-slate-200 dark:border dark:border-slate-700/60 whitespace-nowrap select-none"
                     >
                       #{tag}
                     </span>
@@ -2895,11 +2855,7 @@ function App() {
                   <p className="text-sm">没有找到相关内容</p>
                 </div>
               ) : (
-                <div className={`grid gap-4 ${
-                  siteSettings.cardStyle === 'detailed' 
-                    ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                    : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                }`}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {displayedLinks.map(link => renderLinkCard(link))}
                 </div>
               )}
@@ -2958,11 +2914,7 @@ function App() {
                         items={pinnedLinks.map(link => link.id)}
                         strategy={rectSortingStrategy}
                       >
-                        <div className={`grid gap-4 ${
-                          siteSettings.cardStyle === 'detailed' 
-                            ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                            : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                        }`}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                           {pinnedLinks.map(link => (
                             <SortableLinkCard key={link.id} link={link} />
                           ))}
@@ -2970,11 +2922,7 @@ function App() {
                       </SortableContext>
                     </DndContext>
                   ) : (
-                    <div className={`grid gap-4 ${
-                      siteSettings.cardStyle === 'detailed' 
-                        ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                        : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                    }`}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                       {pinnedLinks.map(link => renderLinkCard(link))}
                     </div>
                   )}
@@ -3075,11 +3023,7 @@ function App() {
                           items={catLinks.map(link => link.id)}
                           strategy={rectSortingStrategy}
                         >
-                          <div className={`grid gap-4 ${
-                            siteSettings.cardStyle === 'detailed' 
-                              ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                              : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                          }`}>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                             {catLinks.map(link => (
                               <SortableLinkCard key={link.id} link={link} />
                             ))}
@@ -3087,11 +3031,7 @@ function App() {
                         </SortableContext>
                       </DndContext>
                     ) : (
-                      <div className={`grid gap-4 ${
-                        siteSettings.cardStyle === 'detailed' 
-                          ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' 
-                          : 'grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8'
-                      }`}>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                         {catLinks.map(link => renderLinkCard(link))}
                       </div>
                     )}

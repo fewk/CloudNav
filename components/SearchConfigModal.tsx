@@ -186,7 +186,7 @@ const SearchConfigModal: React.FC<SearchConfigModalProps> = ({
             <h3 className="text-sm font-medium dark:text-white mb-3">添加新搜索源</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">名称</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">名称</label>
                 <input
                   type="text"
                   value={newSource.name || ''}
@@ -196,7 +196,7 @@ const SearchConfigModal: React.FC<SearchConfigModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">搜索URL</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">搜索URL</label>
                 <input
                   type="text"
                   value={newSource.url || ''}
@@ -207,7 +207,7 @@ const SearchConfigModal: React.FC<SearchConfigModalProps> = ({
               </div>
             </div>
             <div className="mt-3 flex justify-between items-center">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 提示：URL中必须包含 <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded">{'{query}'}</code> 作为搜索关键词占位符
               </span>
               <button
