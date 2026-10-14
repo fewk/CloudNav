@@ -1004,7 +1004,7 @@ function App() {
       }
       
       newCategories.forEach(nc => {
-          if (!mergedCategories.some(c => c.id === nc.id || c.name === nc.name)) {
+          if (!mergedCategories.some(c => c.id === nc.id || (c.name.toLowerCase() === nc.name.toLowerCase() && (c.parentId || '') === (nc.parentId || '')))) {
               mergedCategories.push(nc);
           }
       });

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, Check, AlertCircle, FolderInput, ListTree, Database } from 'lucide-react';
+import { Upload, FileText, Check, AlertCircle, FolderInput, ListTree, Database, Tag, Sparkles } from 'lucide-react';
 import { Category, LinkItem, SearchConfig, AIConfig } from '../types';
 import { parseBookmarks } from '../services/bookmarkParser';
 
@@ -28,7 +28,9 @@ const ImportView: React.FC<ImportViewProps> = ({
   // Analysis Results
   const [newLinksCount, setNewLinksCount] = useState(0);
   const [duplicateCount, setDuplicateCount] = useState(0);
-  const [newCategoriesCount, setNewCategoriesCount] = useState(0);
+  const [newL1Count, setNewL1Count] = useState(0);
+  const [newL2Count, setNewL2Count] = useState(0);
+  const [taggedLinksCount, setTaggedLinksCount] = useState(0);
   
   // Staging Data
   const [parsedLinks, setParsedLinks] = useState<LinkItem[]>([]);
@@ -69,7 +71,9 @@ const ImportView: React.FC<ImportViewProps> = ({
     setParsedAIConfig(null);
     setNewLinksCount(0);
     setDuplicateCount(0);
-    setNewCategoriesCount(0);
+    setNewL1Count(0);
+    setNewL2Count(0);
+    setTaggedLinksCount(0);
     setImportType('html');
   };
 
@@ -89,11 +93,12 @@ const ImportView: React.FC<ImportViewProps> = ({
         result = await parseJsonBackup(selectedFile);
       }
       
-      // 2. Diff Logic
+      // 1. Link Diff Logic
       const existingUrls = new Set(existingLinks.map(l => l.url.trim().replace(/\/$/, '')));
       
       const uniqueNewLinks: LinkItem[] = [];
       let duplicates = 0;
+      let taggedCount = 0;
 
       result.links.forEach(link => {
         const normalizedUrl = link.url.trim().replace(/\/$/, '');
@@ -101,20 +106,59 @@ const ImportView: React.FC<ImportViewProps> = ({
           duplicates++;
         } else {
           uniqueNewLinks.push(link);
+          if (link.tags && link.tags.length > 0) {
+            taggedCount++;
+          }
         }
       });
 
-      // 3. Category Diff
-      const existingCategoryNames = new Set(categories.map(c => c.name));
-      const uniqueNewCategories = result.categories.filter(c => !existingCategoryNames.has(c.name));
+      // 2. Category Diff & Hierarchy Analysis
+      const existingL1 = new Map<string, Category>();
+      const existingL2 = new Map<string, Category>();
+
+      categories.forEach(c => {
+        if (!c.parentId) {
+          existingL1.set(c.name.trim().toLowerCase(), c);
+        } else {
+          existingL2.set(`${c.parentId}:${c.name.trim().toLowerCase()}`, c);
+        }
+      });
+
+      const tempL1Map = new Map<string, string>(); // parsedL1Id -> targetL1Id
+      let l1New = 0;
+      let l2New = 0;
+
+      const parsedL1 = result.categories.filter(c => !c.parentId);
+      parsedL1.forEach(l1 => {
+        const normName = l1.name.trim().toLowerCase();
+        const existing = existingL1.get(normName);
+        if (existing) {
+          tempL1Map.set(l1.id, existing.id);
+        } else {
+          l1New++;
+          tempL1Map.set(l1.id, l1.id);
+        }
+      });
+
+      const parsedL2 = result.categories.filter(c => !!c.parentId);
+      parsedL2.forEach(l2 => {
+        const normName = l2.name.trim().toLowerCase();
+        const targetParentId = l2.parentId ? tempL1Map.get(l2.parentId) || l2.parentId : undefined;
+        const key = `${targetParentId}:${normName}`;
+        if (!existingL2.has(key)) {
+          l2New++;
+        }
+      });
 
       setParsedLinks(uniqueNewLinks);
-      setParsedCategories(uniqueNewCategories);
+      setParsedCategories(result.categories);
       setParsedSearchConfig(result.searchConfig || null);
       setParsedAIConfig(result.aiConfig || null);
       setNewLinksCount(uniqueNewLinks.length);
       setDuplicateCount(duplicates);
-      setNewCategoriesCount(uniqueNewCategories.length);
+      setNewL1Count(l1New);
+      setNewL2Count(l2New);
+      setTaggedLinksCount(taggedCount);
       
       setStep('preview');
     } catch (error) {
@@ -125,7 +169,6 @@ const ImportView: React.FC<ImportViewProps> = ({
       console.error(error);
     } finally {
       setAnalyzing(false);
-      // Reset input value so re-selecting same file triggers onChange
       e.target.value = '';
     }
   };
@@ -141,26 +184,63 @@ const ImportView: React.FC<ImportViewProps> = ({
       }));
       finalCategories = []; 
     } else {
-      const nameToIdMap = new Map<string, string>();
-      categories.forEach(c => nameToIdMap.set(c.name, c.id));
+      // 方案 A：精准层级重映射与去重
+      const existingL1 = new Map<string, Category>();
+      const existingL2 = new Map<string, Category>();
 
-      const categoriesToAdd: Category[] = [];
-
-      parsedCategories.forEach(pc => {
-        if (!nameToIdMap.has(pc.name)) {
-          categoriesToAdd.push(pc);
-          nameToIdMap.set(pc.name, pc.id);
+      categories.forEach(c => {
+        if (!c.parentId) {
+          existingL1.set(c.name.trim().toLowerCase(), c);
+        } else {
+          existingL2.set(`${c.parentId}:${c.name.trim().toLowerCase()}`, c);
         }
       });
 
-      finalLinks = finalLinks.map(link => {
-        const originalCat = parsedCategories.find(c => c.id === link.categoryId) 
-                            || categories.find(c => c.id === link.categoryId);
-        
-        if (originalCat && nameToIdMap.has(originalCat.name)) {
-          return { ...link, categoryId: nameToIdMap.get(originalCat.name)! };
+      const categoryRemap = new Map<string, string>();
+      const categoriesToAdd: Category[] = [];
+
+      // 1. 匹配并映射一级主分类
+      const parsedL1 = parsedCategories.filter(c => !c.parentId);
+      parsedL1.forEach(l1 => {
+        const normName = l1.name.trim().toLowerCase();
+        const existing = existingL1.get(normName);
+        if (existing) {
+          categoryRemap.set(l1.id, existing.id);
+        } else {
+          categoriesToAdd.push(l1);
+          categoryRemap.set(l1.id, l1.id);
+          existingL1.set(normName, l1);
         }
-        return { ...link, categoryId: 'common' };
+      });
+
+      // 2. 匹配并映射二级子分类 (parentId 指向已解析/已有的一级分类)
+      const parsedL2 = parsedCategories.filter(c => !!c.parentId);
+      parsedL2.forEach(l2 => {
+        const normName = l2.name.trim().toLowerCase();
+        const targetParentId = l2.parentId ? categoryRemap.get(l2.parentId) || l2.parentId : undefined;
+        const key = `${targetParentId}:${normName}`;
+        const existing = existingL2.get(key);
+
+        if (existing) {
+          categoryRemap.set(l2.id, existing.id);
+        } else {
+          const newL2: Category = {
+            ...l2,
+            parentId: targetParentId
+          };
+          categoriesToAdd.push(newL2);
+          categoryRemap.set(l2.id, newL2.id);
+          existingL2.set(key, newL2);
+        }
+      });
+
+      // 3. 重映射所有新增链接的 categoryId
+      finalLinks = finalLinks.map(link => {
+        const targetCatId = categoryRemap.get(link.categoryId) || link.categoryId || 'common';
+        return {
+          ...link,
+          categoryId: targetCatId
+        };
       });
 
       finalCategories = categoriesToAdd;
@@ -209,7 +289,7 @@ const ImportView: React.FC<ImportViewProps> = ({
             {analyzing && importType === 'html' ? (
               <div className="flex flex-col items-center py-4">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mb-3"></div>
-                <span className="text-sm text-slate-500 dark:text-slate-400">正在分析书签文件...</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">正在分析书签层级与链接...</span>
               </div>
             ) : (
               <>
@@ -218,7 +298,7 @@ const ImportView: React.FC<ImportViewProps> = ({
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">导入浏览器书签 (HTML)</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">支持 Chrome、Edge、Firefox 导出的书签文件</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">支持 Chrome、Edge、Firefox、Safari 导出的书签</p>
                 </div>
                 <span className="text-xs px-3 py-1 bg-white dark:bg-slate-700 rounded-full border border-slate-200 dark:border-slate-600 text-blue-600 dark:text-blue-300 font-medium">
                   点击上传 .html 文件
@@ -266,20 +346,34 @@ const ImportView: React.FC<ImportViewProps> = ({
       {step === 'preview' && (
         <div className="space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-4 bg-green-50/80 dark:bg-green-900/20 rounded-xl text-center border border-green-200/80 dark:border-green-900/40">
               <div className="text-2xl font-bold text-green-600 dark:text-green-400">{newLinksCount}</div>
               <div className="text-xs text-green-700 dark:text-green-300 font-medium mt-1">新增链接</div>
+            </div>
+            <div className="p-4 bg-blue-50/80 dark:bg-blue-900/20 rounded-xl text-center border border-blue-200/80 dark:border-blue-900/40">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{importMode === 'original' ? newL1Count : 0}</div>
+              <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mt-1">新增主分类</div>
+            </div>
+            <div className="p-4 bg-indigo-50/80 dark:bg-indigo-900/20 rounded-xl text-center border border-indigo-200/80 dark:border-indigo-900/40">
+              <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{importMode === 'original' ? newL2Count : 0}</div>
+              <div className="text-xs text-indigo-700 dark:text-indigo-300 font-medium mt-1">新增子分类</div>
             </div>
             <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center border border-slate-200 dark:border-slate-600">
               <div className="text-2xl font-bold text-slate-600 dark:text-slate-300">{duplicateCount}</div>
               <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">重复跳过</div>
             </div>
-            <div className="p-4 bg-purple-50/80 dark:bg-purple-900/20 rounded-xl text-center border border-purple-200/80 dark:border-purple-900/40">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{importMode === 'original' ? newCategoriesCount : 0}</div>
-              <div className="text-xs text-purple-700 dark:text-purple-300 font-medium mt-1">新增分类</div>
-            </div>
           </div>
+
+          {/* 方案 A 智能标签提炼反馈提示 */}
+          {taggedLinksCount > 0 && importMode === 'original' && (
+            <div className="flex items-start gap-2.5 p-3.5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 border border-purple-200 dark:border-purple-800/40 rounded-xl text-purple-700 dark:text-purple-300 text-xs">
+              <Sparkles size={16} className="shrink-0 mt-0.5 text-purple-600 dark:text-purple-400" />
+              <div>
+                <span className="font-semibold">智能深层标签化：</span>检测到多层嵌套书签，已将三级及以上的子目录自动提取为对应书签的标签（共 <strong className="underline">{taggedLinksCount}</strong> 个书签附带标签），导入后可在卡片上直接点击标签或通过搜索框进行精准筛选！
+              </div>
+            </div>
+          )}
 
           {newLinksCount === 0 ? (
             <div className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-xl text-sm border border-amber-200 dark:border-amber-800/40">
@@ -305,10 +399,10 @@ const ImportView: React.FC<ImportViewProps> = ({
                   />
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 font-medium text-sm text-slate-800 dark:text-white">
-                      <ListTree size={16} className="text-blue-500" /> 保持原目录结构
+                      <ListTree size={16} className="text-blue-500" /> 智能层级导入（主分类 + 子分类 + 深层标签化）
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      保留书签在浏览器中的原有分类层级；若同名分类不存在，将自动新建。
+                      自动穿透系统根容器；第一层建一级主分类，第二层建二级子分类并绑定关联；三级及以上的更深层文件夹自动转换为书签标签（Tags）。
                     </p>
                   </div>
                 </label>
@@ -327,10 +421,10 @@ const ImportView: React.FC<ImportViewProps> = ({
                   />
                   <div className="w-full space-y-2">
                     <div className="flex items-center gap-2 font-medium text-sm text-slate-800 dark:text-white">
-                      <FolderInput size={16} className="text-blue-500" /> 全部归并到指定分类
+                      <FolderInput size={16} className="text-blue-500" /> 全部归并到指定单一分类
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      不新建任何分类，将本次解析出的所有新链接全部导入到所选的目标分类中。
+                      不新建任何主分类或子分类，将本次解析出的所有新链接平铺导入到下方选中的目标分类中。
                     </p>
                     {importMode === 'merge' && (
                       <div className="pt-2">
@@ -341,7 +435,9 @@ const ImportView: React.FC<ImportViewProps> = ({
                           className="w-full text-sm p-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                         >
                           {categories.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c.id} value={c.id}>
+                              {c.parentId ? `  ↳ ${c.name}` : c.name}
+                            </option>
                           ))}
                         </select>
                       </div>

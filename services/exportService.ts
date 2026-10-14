@@ -34,19 +34,60 @@ export const generateBookmarkHtml = (links: LinkItem[], categories: Category[]):
     linksByCat.set(link.categoryId, list);
   });
 
-  // 1. Process Categories
-  categories.forEach(cat => {
+  // 1. Process Categories (Parent categories first, with subcategories nested inside)
+  const parentCategories = categories.filter(c => !c.parentId);
+  const subCategoriesByParent = new Map<string, Category[]>();
+  categories.filter(c => !!c.parentId).forEach(sub => {
+    const list = subCategoriesByParent.get(sub.parentId!) || [];
+    list.push(sub);
+    subCategoriesByParent.set(sub.parentId!, list);
+  });
+
+  const processedCatIds = new Set<string>();
+
+  parentCategories.forEach(cat => {
+    processedCatIds.add(cat.id);
     const catLinks = linksByCat.get(cat.id) || [];
+    const subCats = subCategoriesByParent.get(cat.id) || [];
     
     html += `    <DT><H3 ADD_DATE="${now}" LAST_MODIFIED="${now}">${escapeHtml(cat.name)}</H3>\n`;
     html += `    <DL><p>\n`;
     
+    // Direct links in parent category
     catLinks.forEach(link => {
       const date = Math.floor(link.createdAt / 1000);
       const iconAttr = link.icon ? ` ICON="${link.icon}"` : '';
       html += `        <DT><A HREF="${link.url}" ADD_DATE="${date}"${iconAttr}>${escapeHtml(link.title)}</A>\n`;
     });
 
+    // Subcategories nested inside parent
+    subCats.forEach(sub => {
+      processedCatIds.add(sub.id);
+      const subLinks = linksByCat.get(sub.id) || [];
+      html += `        <DT><H3 ADD_DATE="${now}" LAST_MODIFIED="${now}">${escapeHtml(sub.name)}</H3>\n`;
+      html += `        <DL><p>\n`;
+      subLinks.forEach(link => {
+        const date = Math.floor(link.createdAt / 1000);
+        const iconAttr = link.icon ? ` ICON="${link.icon}"` : '';
+        html += `            <DT><A HREF="${link.url}" ADD_DATE="${date}"${iconAttr}>${escapeHtml(link.title)}</A>\n`;
+      });
+      html += `        </DL><p>\n`;
+    });
+
+    html += `    </DL><p>\n`;
+  });
+
+  // Any orphan categories
+  const orphanCats = categories.filter(c => !processedCatIds.has(c.id));
+  orphanCats.forEach(cat => {
+    const catLinks = linksByCat.get(cat.id) || [];
+    html += `    <DT><H3 ADD_DATE="${now}" LAST_MODIFIED="${now}">${escapeHtml(cat.name)}</H3>\n`;
+    html += `    <DL><p>\n`;
+    catLinks.forEach(link => {
+      const date = Math.floor(link.createdAt / 1000);
+      const iconAttr = link.icon ? ` ICON="${link.icon}"` : '';
+      html += `        <DT><A HREF="${link.url}" ADD_DATE="${date}"${iconAttr}>${escapeHtml(link.title)}</A>\n`;
+    });
     html += `    </DL><p>\n`;
   });
 
