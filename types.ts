@@ -28,6 +28,8 @@ export interface SiteSettings {
   cardStyle: 'detailed' | 'simple';
   passwordExpiryDays: number; // 密码过期天数，0表示永久不退出
   openTarget?: '_blank' | '_self'; // 链接打开方式：_blank (新页面打开) 或 _self (当前页面打开)
+  showDescription?: boolean; // 是否显示卡片介绍，默认为 true
+  showTags?: boolean; // 是否显示卡片标签，默认为 false
 }
 
 export interface AppState {

@@ -111,9 +111,10 @@
    - 依次进入 **Workers 和 Pages** -> **创建应用程序** -> **Pages** -> **连接到 Git**。
    - 选择您 Fork 的 `CloudNav` 仓库并点击“开始设置”。
 3. **构建配置**：
-   - **框架预设**：选择 `无 (None)` 或 `Vite`。
-   - **构建命令**：`npm run build`
-   - **构建输出目录**：`dist`
+   - **框架预设 (Framework preset)**：选择 `Vite`（推荐，会自动补全设置）或 `无 (None)`。
+   - **构建命令 (Build command)**：`npm run build`
+   - **构建输出目录 (Build output directory)**：`dist`
+   - **根目录 (Root directory)**：**留空不用填**（留空即代表项目根目录 `/`）。
 4. **创建 KV 数据库**：
    - 在 Cloudflare 左侧导航栏点击 **Workers 和 Pages** -> **KV** -> **创建命名空间**。
    - 空间名称填写：`CLOUDNAV_DB`。

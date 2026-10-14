@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink } from 'lucide-react';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag } from 'lucide-react';
 import { AIConfig, LinkItem, Category, SiteSettings } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
 import JSZip from 'jszip';
@@ -105,7 +105,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           favicon: siteSettings?.favicon || '',
           cardStyle: siteSettings?.cardStyle || 'detailed',
           passwordExpiryDays: siteSettings?.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7,
-          openTarget: siteSettings?.openTarget || '_blank'
+          openTarget: siteSettings?.openTarget || '_blank',
+          showDescription: siteSettings?.showDescription !== undefined ? siteSettings.showDescription : true,
+          showTags: siteSettings?.showTags !== undefined ? siteSettings.showTags : false
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -130,8 +132,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalSiteSettings(prev => {
         const next = { ...prev, [key]: value };
         
-        // 如果是身份验证过期天数或打开方式修改，立即保存到 KV 空间
-        if ((key === 'passwordExpiryDays' || key === 'openTarget') && authToken) {
+        // 如果是身份验证过期天数、打开方式、介绍或标签显示修改，立即保存到 KV 空间
+        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags') && authToken) {
             saveWebsiteConfigToKV(next);
         }
         
@@ -1154,6 +1156,56 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     {(localSiteSettings.openTarget || '_blank') === '_blank' 
                                         ? '点击书签卡片时，在新的浏览器标签页中打开站点' 
                                         : '点击书签卡片时，直接在当前标签页中跳转'}
+                                </p>
+                            </div>
+
+                            {/* 卡片内容显示 */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    卡片内容显示
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div 
+                                        onClick={() => handleSiteChange('showDescription', localSiteSettings.showDescription === false ? true : false)}
+                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                                            localSiteSettings.showDescription !== false
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <FileText size={16} />
+                                            <span className="text-sm font-medium">显示介绍</span>
+                                        </div>
+                                        <input 
+                                            type="checkbox"
+                                            checked={localSiteSettings.showDescription !== false}
+                                            onChange={() => {}}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 pointer-events-none"
+                                        />
+                                    </div>
+                                    <div 
+                                        onClick={() => handleSiteChange('showTags', !localSiteSettings.showTags)}
+                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                                            localSiteSettings.showTags
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <Tag size={16} />
+                                            <span className="text-sm font-medium">显示标签</span>
+                                        </div>
+                                        <input 
+                                            type="checkbox"
+                                            checked={!!localSiteSettings.showTags}
+                                            onChange={() => {}}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 pointer-events-none"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    控制书签卡片上是否显示文字介绍与分类标签（默认关闭标签展示以保持页面极简清爽）
                                 </p>
                             </div>
 

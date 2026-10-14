@@ -24,7 +24,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig } from './types';
+import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, SiteSettings } from './types';
 import Icon from './components/Icon';
 import ContextMenu from './components/ContextMenu';
 
@@ -146,13 +146,15 @@ function App() {
   });
 
   // Site Settings State
-  const [siteSettings, setSiteSettings] = useState(() => {
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => {
       const saved = localStorage.getItem('cloudnav_site_settings');
       if (saved) {
           try {
               const parsed = JSON.parse(saved);
               return {
                   openTarget: '_blank' as const,
+                  showDescription: true,
+                  showTags: false,
                   ...parsed
               };
           } catch (e) {}
@@ -163,7 +165,9 @@ function App() {
           favicon: '',
           cardStyle: 'detailed' as const,
           passwordExpiryDays: 7,
-          openTarget: '_blank' as const
+          openTarget: '_blank' as const,
+          showDescription: true,
+          showTags: false
       };
   });
   
@@ -626,7 +630,9 @@ function App() {
                 favicon: wc.favicon || prev.favicon,
                 cardStyle: wc.cardStyle || prev.cardStyle,
                 passwordExpiryDays: wc.passwordExpiryDays !== undefined ? wc.passwordExpiryDays : prev.passwordExpiryDays,
-                openTarget: wc.openTarget || prev.openTarget || '_blank'
+                openTarget: wc.openTarget || prev.openTarget || '_blank',
+                showDescription: wc.showDescription !== undefined ? wc.showDescription : (prev.showDescription !== undefined ? prev.showDescription : true),
+                showTags: wc.showTags !== undefined ? wc.showTags : (prev.showTags !== undefined ? prev.showTags : false)
               };
               localStorage.setItem('cloudnav_site_settings', JSON.stringify(updated));
               return updated;
@@ -797,7 +803,9 @@ function App() {
                             favicon: websiteConfigData.favicon || prev.favicon,
                             cardStyle: websiteConfigData.cardStyle || prev.cardStyle,
                             passwordExpiryDays: newExpiryDays,
-                            openTarget: websiteConfigData.openTarget || prev.openTarget || '_blank'
+                            openTarget: websiteConfigData.openTarget || prev.openTarget || '_blank',
+                            showDescription: websiteConfigData.showDescription !== undefined ? websiteConfigData.showDescription : (prev.showDescription !== undefined ? prev.showDescription : true),
+                            showTags: websiteConfigData.showTags !== undefined ? websiteConfigData.showTags : (prev.showTags !== undefined ? prev.showTags : false)
                         }));
                     }
                 }
@@ -1876,6 +1884,9 @@ function App() {
     } = useSortable({ id: link.id });
     
     const isDetailedView = siteSettings.cardStyle === 'detailed';
+    const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
+    const showTags = (siteSettings.showTags === true) && !!link.tags && link.tags.length > 0;
+    const hasExtra = showDesc || (isDetailedView && showTags);
     
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -1894,7 +1905,7 @@ function App() {
             : 'bg-white dark:bg-slate-800'
         } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-[10px] p-[14px] min-h-[96px]' 
+            ? `flex flex-col rounded-[10px] p-[14px] ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
             : 'flex items-center rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         {...attributes}
@@ -1928,19 +1939,31 @@ function App() {
           </div>
           
           {/* 第二行：描述文字 */}
-          {isDetailedView && link.description && (
+          {showDesc && (
             <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
               {link.description}
             </p>
           )}
 
           {/* 第三行：标签展示 */}
-          {isDetailedView && link.tags && link.tags.length > 0 && (
+          {isDetailedView && showTags && (
             <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
-              {link.tags.map((tag, idx) => (
+              {link.tags!.map((tag, idx) => (
                 <span
                   key={idx}
                   className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {!isDetailedView && showTags && (
+            <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-2">
+              {link.tags!.slice(0, 2).map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
                 >
                   #{tag}
                 </span>
@@ -1963,6 +1986,9 @@ function App() {
 
     // 根据视图模式决定卡片样式
     const isDetailedView = siteSettings.cardStyle === 'detailed';
+    const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
+    const showTags = (siteSettings.showTags === true) && !!link.tags && link.tags.length > 0;
+    const hasExtra = showDesc || (isDetailedView && showTags);
     
     return (
       <div
@@ -1975,7 +2001,7 @@ function App() {
               : 'bg-white dark:bg-slate-800'
         } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
           isDetailedView 
-            ? 'flex flex-col rounded-[10px] p-[14px] min-h-[96px]' 
+            ? `flex flex-col rounded-[10px] p-[14px] ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
             : 'flex items-center justify-between rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
         }`}
         onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
@@ -2011,16 +2037,16 @@ function App() {
             </div>
             
             {/* 第二行：描述文字 */}
-            {isDetailedView && link.description && (
+            {showDesc && (
               <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
                 {link.description}
               </p>
             )}
 
             {/* 第三行：标签展示 */}
-            {isDetailedView && link.tags && link.tags.length > 0 && (
+            {isDetailedView && showTags && (
               <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
-                {link.tags.map((tag, idx) => (
+                {link.tags!.map((tag, idx) => (
                   <span
                     key={idx}
                     className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
@@ -2030,9 +2056,9 @@ function App() {
                 ))}
               </div>
             )}
-            {!isDetailedView && link.tags && link.tags.length > 0 && (
+            {!isDetailedView && showTags && (
               <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-2">
-                {link.tags.slice(0, 2).map((tag, idx) => (
+                {link.tags!.slice(0, 2).map((tag, idx) => (
                   <span
                     key={idx}
                     className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-400 select-none"
@@ -2051,7 +2077,7 @@ function App() {
             className={`flex flex-1 min-w-0 overflow-hidden h-full ${
               isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
             }`}
-            title={isDetailedView ? link.url : (link.description || link.url)}
+            title={isDetailedView ? link.url : (showDesc && link.description ? link.description : link.url)}
           >
             {/* 第一行：图标和标题 */}
             <div className={`flex items-center gap-3 ${isDetailedView ? 'w-full' : 'flex-1 min-w-0'}`}>
@@ -2078,16 +2104,16 @@ function App() {
             </div>
             
             {/* 第二行：描述文字 */}
-            {isDetailedView && link.description && (
+            {showDesc && (
               <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
                 {link.description}
               </p>
             )}
 
             {/* 第三行：标签展示 */}
-            {isDetailedView && link.tags && link.tags.length > 0 && (
+            {isDetailedView && showTags && (
               <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
-                {link.tags.map((tag, idx) => (
+                {link.tags!.map((tag, idx) => (
                   <span
                     key={idx}
                     onClick={(e) => {
@@ -2103,9 +2129,9 @@ function App() {
                 ))}
               </div>
             )}
-            {!isDetailedView && link.tags && link.tags.length > 0 && (
+            {!isDetailedView && showTags && (
               <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto mr-7">
-                {link.tags.slice(0, 2).map((tag, idx) => (
+                {link.tags!.slice(0, 2).map((tag, idx) => (
                   <span
                     key={idx}
                     onClick={(e) => {
@@ -2121,7 +2147,7 @@ function App() {
                 ))}
               </div>
             )}
-            {!isDetailedView && link.description && (
+            {!isDetailedView && (siteSettings.showDescription !== false) && link.description && (
               <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[200px] bg-black text-white text-xs p-2 rounded opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate">
                 {link.description}
               </div>
