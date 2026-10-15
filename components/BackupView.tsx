@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Download, Upload, CheckCircle2, AlertCircle, Save, HardDrive, RefreshCw } from 'lucide-react';
-import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig } from '../types';
+import { Cloud, Download, Upload, CheckCircle2, AlertCircle, Save, HardDrive, RefreshCw, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Category, LinkItem, WebDavConfig, SearchConfig, AIConfig, DEFAULT_CATEGORIES, INITIAL_LINKS } from '../types';
 import { checkWebDavConnection, uploadBackup, uploadBackupWithTimestamp, downloadBackup } from '../services/webDavService';
 import { generateBookmarkHtml, downloadHtmlFile } from '../services/exportService';
 
@@ -140,6 +140,25 @@ const BackupView: React.FC<BackupViewProps> = ({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleClearAllData = () => {
+    if (!confirm("⚠️ 危险操作确认：\n\n确定要彻底清空当前库中的所有书签和自定义分类吗？\n\n• 执行后所有书签将被清空（仅保留干净的「常用推荐」根分类）；\n• 数据将同步清空 Cloudflare KV 云端数据库与本地缓存；\n• 非常适合在重新全量导入浏览器书签前使用。\n\n建议在清空前先在上方点击「导出 JSON」留存备份。确定继续吗？")) {
+      return;
+    }
+    const cleanCategories: Category[] = [{ id: 'common', name: '常用推荐', icon: 'Star' }];
+    onRestore([], cleanCategories);
+    setSyncStatus('success');
+    setStatusMsg('所有书签与自定义分类已彻底清空，现在您可以前往「书签导入」重新导入！');
+  };
+
+  const handleResetToDefault = () => {
+    if (!confirm("确定要恢复为系统自带的默认示例书签与分类吗？\n\n当前所有的自定义书签将被系统默认数据覆盖。")) {
+      return;
+    }
+    onRestore(INITIAL_LINKS, DEFAULT_CATEGORIES);
+    setSyncStatus('success');
+    setStatusMsg('已成功恢复为系统默认初始演示数据！');
   };
 
   return (
@@ -338,6 +357,56 @@ const BackupView: React.FC<BackupViewProps> = ({
               className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-green-500 text-slate-700 dark:text-slate-200 hover:text-green-600 dark:hover:text-green-400 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
             >
               <Download size={14} /> 导出 JSON
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 4: Danger Zone */}
+      <section className="space-y-4 pt-2">
+        <div className="pb-2 border-b border-red-200 dark:border-red-900/40">
+          <h4 className="font-semibold text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+            <AlertTriangle size={18} /> 危险区域：数据清空与重置
+          </h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            在重新全量导入书签前，可一键清空现有杂乱书签或恢复到项目初始默认状态
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/40 dark:bg-red-950/20 flex flex-col justify-between gap-3">
+            <div>
+              <h5 className="text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-1.5">
+                <Trash2 size={15} /> 清空所有书签与自定义分类
+              </h5>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                彻底抹除当前所有书签链接和自定义分类（仅保留干净的「常用推荐」根目录），并同步清空云端数据库，专为重新全量导入打造。
+              </p>
+            </div>
+            <button 
+              type="button"
+              onClick={handleClearAllData}
+              className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-all shadow-sm shadow-red-500/20 flex items-center justify-center gap-1.5 mt-1"
+            >
+              <Trash2 size={14} /> 一键清空全库数据
+            </button>
+          </div>
+
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 flex flex-col justify-between gap-3">
+            <div>
+              <h5 className="text-sm font-semibold text-slate-800 dark:text-white flex items-center gap-1.5">
+                <RotateCcw size={15} className="text-blue-500" /> 恢复系统默认演示数据
+              </h5>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                将全站书签与分类结构重置为项目初始自带的演示站点列表（Google、百度、GitHub、React 等）。
+              </p>
+            </div>
+            <button 
+              type="button"
+              onClick={handleResetToDefault}
+              className="w-full py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:border-slate-400 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-1.5 mt-1"
+            >
+              <RotateCcw size={14} /> 恢复为初始演示数据
             </button>
           </div>
         </div>
