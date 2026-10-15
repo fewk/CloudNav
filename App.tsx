@@ -1502,7 +1502,15 @@ function App() {
     const container = contentScrollRef.current;
     const scrollY = container.scrollTop;
     
-    const sectionIds = ['pinned', ...categories.filter(c => !c.parentId).map(c => `cat-${c.id}`)];
+    // 按 DOM 纵向渲染顺序收集所有锚点 ID（包含置顶、父分类及各子分类）
+    const sectionIds: string[] = ['pinned'];
+    for (const cat of categories.filter(c => !c.parentId)) {
+      sectionIds.push(`cat-${cat.id}`);
+      const subCats = categories.filter(c => c.parentId === cat.id);
+      for (const sub of subCats) {
+        sectionIds.push(`cat-${sub.id}`);
+      }
+    }
     
     for (const secId of sectionIds) {
       const el = document.getElementById(secId);
@@ -1519,12 +1527,22 @@ function App() {
   const scrollToSection = (targetId: string) => {
     if (searchQuery.trim()) {
       setSearchQuery('');
-    }
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.history.replaceState(null, '', `#${targetId}`);
-      setActiveSection(targetId);
+      // 若处于搜索结果态，等状态清空切回主分类流后再执行平滑滚动
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.history.replaceState(null, '', `#${targetId}`);
+          setActiveSection(targetId);
+        }
+      }, 50);
+    } else {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.history.replaceState(null, '', `#${targetId}`);
+        setActiveSection(targetId);
+      }
     }
     setSidebarOpen(false);
   };
@@ -1871,6 +1889,20 @@ function App() {
         if (parentId && map.has(parentId)) {
           map.get(parentId)!.push(l);
         }
+      }
+    }
+    return map;
+  }, [links, categories]);
+
+  // 建立单个分类 (含一级直属与二级分类) 的链接映射表
+  const directCategoryLinksMap = useMemo(() => {
+    const map = new Map<string, LinkItem[]>();
+    for (const c of categories) {
+      map.set(c.id, []);
+    }
+    for (const l of links) {
+      if (map.has(l.categoryId)) {
+        map.get(l.categoryId)!.push(l);
       }
     }
     return map;
@@ -2929,15 +2961,35 @@ function App() {
                         {/* 二级分类快速定位 */}
                         {subCats.length > 0 && (
                           <div className="flex items-center gap-2 ml-2 overflow-x-auto no-scrollbar py-0.5">
-                            {subCats.map(sub => (
-                              <button
-                                key={sub.id}
-                                onClick={() => scrollToSection(`cat-${sub.id}`)}
-                                className="text-xs px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-all shadow-sm"
-                              >
-                                {sub.name}
-                              </button>
-                            ))}
+                            {subCats.map(sub => {
+                              const isSubLocked = isCategoryLocked(sub.id);
+                              const isSubActive = activeSection === `cat-${sub.id}`;
+                              return (
+                                <button
+                                  key={sub.id}
+                                  onClick={() => {
+                                    if (isSubLocked) {
+                                      setCatAuthModalData(sub);
+                                      return;
+                                    }
+                                    scrollToSection(`cat-${sub.id}`);
+                                  }}
+                                  className={`text-xs px-2.5 py-1 rounded-full border transition-all shadow-sm flex items-center gap-1.5 ${
+                                    isSubActive
+                                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 font-semibold shadow-blue-500/10'
+                                      : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300'
+                                  }`}
+                                  title={`跳转到 ${sub.name}`}
+                                >
+                                  {isSubLocked ? (
+                                    <Lock size={11} className="text-amber-500" />
+                                  ) : (
+                                    <Icon name={sub.icon} size={12} className={isSubActive ? 'text-blue-500' : 'text-slate-400'} />
+                                  )}
+                                  <span>{sub.name}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -3004,7 +3056,7 @@ function App() {
                           </div>
                         </SortableContext>
                       </DndContext>
-                    ) : (
+                    ) : subCats.length === 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                         {catLinks.map(link => (
                           <LinkCard
@@ -3023,6 +3075,91 @@ function App() {
                             onTagClick={handleTagClick}
                           />
                         ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* 1. 一级分类直属链接 (若存在) */}
+                        {(directCategoryLinksMap.get(cat.id)?.length || 0) > 0 && (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                              {directCategoryLinksMap.get(cat.id)!.map(link => (
+                                <LinkCard
+                                  key={link.id}
+                                  link={link}
+                                  isDetailedView={isDetailedView}
+                                  showDescription={siteSettings.showDescription !== false}
+                                  showTags={siteSettings.showTags === true}
+                                  openTarget={siteSettings.openTarget}
+                                  isSelected={selectedLinks.has(link.id)}
+                                  isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                                  isBatchEditMode={isBatchEditMode}
+                                  onToggleSelection={toggleLinkSelection}
+                                  onContextMenu={handleContextMenu}
+                                  onEdit={handleOpenEditModal}
+                                  onTagClick={handleTagClick}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. 各二级分类独立锚点区域 */}
+                        {subCats.map(sub => {
+                          const isSubLocked = isCategoryLocked(sub.id);
+                          const subLinks = directCategoryLinksMap.get(sub.id) || [];
+
+                          return (
+                            <div 
+                              key={sub.id} 
+                              id={`cat-${sub.id}`} 
+                              className="scroll-mt-6 space-y-3 pt-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-1 h-3.5 bg-blue-500/70 dark:bg-blue-400 rounded-full shrink-0"></div>
+                                <h3 className="text-[14px] font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                                  <Icon name={sub.icon} size={15} className="text-blue-500/80 dark:text-blue-400" />
+                                  <span>{sub.name}</span>
+                                </h3>
+                                {isSubLocked && <Lock size={12} className="text-amber-500" />}
+                                <span className="text-[11px] px-1.5 py-0.5 font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-full border border-slate-200/60 dark:border-slate-700/60">
+                                  {subLinks.length}
+                                </span>
+                              </div>
+
+                              {isSubLocked ? (
+                                <div className="flex flex-col items-center justify-center py-6 text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                                  <Lock size={24} className="text-amber-400 mb-1.5" />
+                                  <p className="text-xs">该子分类已加锁保护</p>
+                                  <button onClick={() => setCatAuthModalData(sub)} className="mt-2 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-medium">输入密码解锁</button>
+                                </div>
+                              ) : subLinks.length === 0 ? (
+                                <div className="py-6 text-center text-slate-400 border border-dashed border-slate-200 dark:border-slate-700/60 rounded-xl text-xs">
+                                  暂无链接
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                  {subLinks.map(link => (
+                                    <LinkCard
+                                      key={link.id}
+                                      link={link}
+                                      isDetailedView={isDetailedView}
+                                      showDescription={siteSettings.showDescription !== false}
+                                      showTags={siteSettings.showTags === true}
+                                      openTarget={siteSettings.openTarget}
+                                      isSelected={selectedLinks.has(link.id)}
+                                      isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                                      isBatchEditMode={isBatchEditMode}
+                                      onToggleSelection={toggleLinkSelection}
+                                      onContextMenu={handleContextMenu}
+                                      onEdit={handleOpenEditModal}
+                                      onTagClick={handleTagClick}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </section>
