@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
@@ -28,6 +28,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, SiteSettings } from './types';
 import Icon from './components/Icon';
 import ContextMenu from './components/ContextMenu';
+import LinkCard from './components/LinkCard';
 
 // 懒加载所有模态框组件与重量级依赖（@google/genai, jszip等），极大压缩首屏与新标签页 JS 体积
 const LinkModal = React.lazy(() => import('./components/LinkModal'));
@@ -111,6 +112,7 @@ function App() {
   const [categories, setCategories] = useState<Category[]>(initialNavData.categories);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -400,7 +402,7 @@ function App() {
   };
 
   // --- Context Menu Functions ---
-  const handleContextMenu = (event: React.MouseEvent, link: LinkItem) => {
+  const handleContextMenu = useCallback((event: React.MouseEvent, link: LinkItem) => {
     event.preventDefault();
     event.stopPropagation();
     
@@ -412,7 +414,7 @@ function App() {
       position: { x: event.clientX, y: event.clientY },
       link: link
     });
-  };
+  }, [isBatchEditMode]);
 
   const closeContextMenu = () => {
     setContextMenu({
@@ -756,7 +758,7 @@ function App() {
     setSelectedLinks(new Set()); // 退出批量编辑模式时清空选中项
   };
 
-  const toggleLinkSelection = (linkId: string) => {
+  const toggleLinkSelection = useCallback((linkId: string) => {
     setSelectedLinks(prev => {
       const newSet = new Set(prev);
       if (newSet.has(linkId)) {
@@ -766,7 +768,7 @@ function App() {
       }
       return newSet;
     });
-  };
+  }, []);
 
   const handleBatchDelete = () => {
     if (!authToken) { setIsAuthOpen(true); return; }
@@ -1835,22 +1837,58 @@ function App() {
       });
   }, [links, categories, unlockedCategoryIds]);
 
+  // 预计算搜索字符串索引，避免每次按键对数千条数据进行重复 toLowerCase 与频繁内存分配
+  const searchIndex = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const l of links) {
+      const text = `${l.title} ${l.url} ${l.description || ''} ${l.emoji || ''} ${l.tags ? l.tags.join(' ') : ''}`.toLowerCase();
+      map.set(l.id, text);
+    }
+    return map;
+  }, [links]);
+
+  // 预先建立父分类下的所有关联链接映射表，极大减少首页全景流对于海量链接的反复遍历过滤
+  const parentCategoryLinksMap = useMemo(() => {
+    const subToParentMap = new Map<string, string>();
+    for (const c of categories) {
+      if (c.parentId) {
+        subToParentMap.set(c.id, c.parentId);
+      }
+    }
+
+    const map = new Map<string, LinkItem[]>();
+    for (const c of categories) {
+      if (!c.parentId) {
+        map.set(c.id, []);
+      }
+    }
+
+    for (const l of links) {
+      if (map.has(l.categoryId)) {
+        map.get(l.categoryId)!.push(l);
+      } else {
+        const parentId = subToParentMap.get(l.categoryId);
+        if (parentId && map.has(parentId)) {
+          map.get(parentId)!.push(l);
+        }
+      }
+    }
+    return map;
+  }, [links, categories]);
+
   const displayedLinks = useMemo(() => {
     let result = links;
     
     // Security Filter: Always hide links from locked categories
     result = result.filter(l => !isCategoryLocked(l.categoryId));
 
-    // Search Filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(l => 
-        l.title.toLowerCase().includes(q) || 
-        l.url.toLowerCase().includes(q) ||
-        (l.description && l.description.toLowerCase().includes(q)) ||
-        (l.emoji && l.emoji.toLowerCase().includes(q)) ||
-        (l.tags && l.tags.some(tag => tag.toLowerCase().includes(q)))
-      );
+    // Search Filter using deferredSearchQuery and searchIndex
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter(l => {
+        const text = searchIndex.get(l.id);
+        return text ? text.includes(q) : false;
+      });
     }
 
     // Category Filter
@@ -1869,15 +1907,14 @@ function App() {
       // 改为升序排序，这样order值小(旧卡片)的排在前面，order值大(新卡片)的排在后面
       return aOrder - bOrder;
     });
-  }, [links, selectedCategory, searchQuery, categories, unlockedCategoryIds]);
+  }, [links, selectedCategory, deferredSearchQuery, categories, unlockedCategoryIds, searchIndex]);
 
   // 计算其他目录的搜索结果
   const otherCategoryResults = useMemo(() => {
-    if (!searchQuery.trim() || selectedCategory === 'all') {
-      return [];
+    const q = deferredSearchQuery.trim().toLowerCase();
+    if (!q || selectedCategory === 'all') {
+      return {};
     }
-
-    const q = searchQuery.toLowerCase();
     
     // 获取其他目录中匹配的链接
     const otherLinks = links.filter(link => {
@@ -1892,13 +1929,8 @@ function App() {
       }
       
       // 搜索匹配
-      return (
-        link.title.toLowerCase().includes(q) || 
-        link.url.toLowerCase().includes(q) ||
-        (link.description && link.description.toLowerCase().includes(q)) ||
-        (link.emoji && link.emoji.toLowerCase().includes(q)) ||
-        (link.tags && link.tags.some(tag => tag.toLowerCase().includes(q)))
-      );
+      const text = searchIndex.get(link.id);
+      return text ? text.includes(q) : false;
     });
 
     // 按目录分组
@@ -1920,7 +1952,7 @@ function App() {
     });
 
     return groupedByCategory;
-  }, [links, selectedCategory, searchQuery, categories, unlockedCategoryIds]);
+  }, [links, selectedCategory, deferredSearchQuery, categories, unlockedCategoryIds, searchIndex]);
 
 
   // --- Render Components ---
@@ -2018,179 +2050,23 @@ function App() {
     );
   };
 
-  const renderLinkCard = (link: LinkItem) => {
-    const isSelected = selectedLinks.has(link.id);
-    
-    // 检查是否在有二级分类的一级分类页面下，且该站点未归属到二级分类
-    const isUnassignedHighlight = selectedCategory !== 'all' && 
-                                 !categories.find(c => c.id === selectedCategory)?.parentId && 
-                                 link.categoryId === selectedCategory && 
-                                 categories.some(c => c.parentId === selectedCategory);
+  // --- LinkCard Memoized Callbacks & Helpers ---
+  const handleOpenEditModal = useCallback((link: LinkItem) => {
+    setEditingLink(link);
+    setIsModalOpen(true);
+  }, []);
 
-    // 根据视图模式决定卡片样式
-    const isDetailedView = siteSettings.cardStyle === 'detailed';
-    const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
-    const showTags = (siteSettings.showTags === true) && isDetailedView && !!link.tags && link.tags.length > 0;
-    const hasExtra = showDesc || (isDetailedView && showTags);
-    
-    return (
-      <div
-        key={link.id}
-        className={`group relative transition-all duration-200 ${
-          isSelected 
-            ? 'bg-red-50 dark:bg-red-900/30 ring-1 ring-red-300 dark:ring-red-800' 
-            : isUnassignedHighlight
-              ? 'bg-amber-50/70 dark:bg-amber-900/20 ring-1 ring-amber-300 dark:ring-amber-800/50'
-              : 'bg-white dark:bg-slate-800'
-        } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
-          isDetailedView 
-            ? `flex flex-col rounded-[10px] p-[14px] ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
-            : 'flex items-center justify-between rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
-        }`}
-        onClick={() => isBatchEditMode && toggleLinkSelection(link.id)}
-        onContextMenu={(e) => handleContextMenu(e, link)}
-      >
-        {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
-        {isBatchEditMode ? (
-          <div className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-            isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
-          }`}>
-            {/* 第一行：图标和标题 */}
-            <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
-                isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-              }`}>
-                {link.icon ? (
-                  <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-                ) : (
-                  link.title.charAt(0)
-                )}
-              </div>
-              
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                  isDetailedView ? 'text-[16px]' : 'text-[14px]'
-                }`} title={link.title}>
-                  {link.title}
-                </h3>
-                {link.emoji && (
-                  <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
-                    {link.emoji}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            {/* 第二行：描述文字 */}
-            {showDesc && (
-              <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
-                {link.description}
-              </p>
-            )}
+  const handleTagClick = useCallback((tag: string) => {
+    setSearchQuery(tag);
+  }, []);
 
-            {/* 第三行：标签展示 */}
-            {isDetailedView && showTags && (
-              <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
-                {link.tags!.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <a
-            href={link.url}
-            target={siteSettings.openTarget === '_self' ? '_self' : '_blank'}
-            rel={siteSettings.openTarget === '_self' ? undefined : "noopener noreferrer"}
-            className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-              isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
-            }`}
-            title={isDetailedView ? link.url : (showDesc && link.description ? link.description : link.url)}
-          >
-            {/* 第一行：图标和标题 */}
-            <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-              <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
-                isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-              }`}>
-                {link.icon ? (
-                  <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-                ) : (
-                  link.title.charAt(0)
-                )}
-              </div>
-              
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-[#ff6000] dark:group-hover:text-blue-400 transition-colors ${
-                  isDetailedView ? 'text-[16px]' : 'text-[14px]'
-                }`} title={link.title}>
-                  {link.title}
-                </h3>
-                {link.emoji && (
-                  <span className="shrink-0 text-sm select-none" title={`标记: ${link.emoji}`}>
-                    {link.emoji}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            {/* 第二行：描述文字 */}
-            {showDesc && (
-              <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
-                {link.description}
-              </p>
-            )}
-
-            {/* 第三行：标签展示 */}
-            {isDetailedView && showTags && (
-              <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
-                {link.tags!.map((tag, idx) => (
-                  <span
-                    key={idx}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSearchQuery(tag);
-                    }}
-                    className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
-                    title={`按标签 #${tag} 筛选`}
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-            {!isDetailedView && (siteSettings.showDescription !== false) && link.description && (
-              <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[200px] bg-black text-white text-xs p-2 rounded opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate">
-                {link.description}
-              </div>
-            )}
-          </a>
-        )}
-
-        {/* Hover Actions */}
-        {!isBatchEditMode && (
-          <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-md p-1 absolute ${
-            isDetailedView ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
-          }`}>
-              <button 
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingLink(link); setIsModalOpen(true); }}
-                  className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-                  title="编辑"
-              >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.08-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.32-.07.64-.07.97c0 .33.03.65.07.97l-2.11 1.63c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.08.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.11-1.63Z" fill="currentColor"/>
-                  </svg>
-              </button>
-          </div>
-        )}
-      </div>
-    );
-  };
+  const isDetailedView = siteSettings.cardStyle === 'detailed';
+  const isSelectedCategoryParentWithChildren = useMemo(() => {
+    if (selectedCategory === 'all') return false;
+    const currentCat = categories.find(c => c.id === selectedCategory);
+    if (currentCat?.parentId) return false;
+    return categories.some(c => c.parentId === selectedCategory);
+  }, [selectedCategory, categories]);
 
   return (
     <div className="flex h-screen overflow-hidden text-slate-900 dark:text-slate-50">
@@ -2923,7 +2799,23 @@ function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {displayedLinks.map(link => renderLinkCard(link))}
+                  {displayedLinks.map(link => (
+                    <LinkCard
+                      key={link.id}
+                      link={link}
+                      isDetailedView={isDetailedView}
+                      showDescription={siteSettings.showDescription !== false}
+                      showTags={siteSettings.showTags === true}
+                      openTarget={siteSettings.openTarget}
+                      isSelected={selectedLinks.has(link.id)}
+                      isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                      isBatchEditMode={isBatchEditMode}
+                      onToggleSelection={toggleLinkSelection}
+                      onContextMenu={handleContextMenu}
+                      onEdit={handleOpenEditModal}
+                      onTagClick={handleTagClick}
+                    />
+                  ))}
                 </div>
               )}
             </section>
@@ -2931,7 +2823,7 @@ function App() {
             <>
               {/* 热门推荐 / 置顶专区 (#pinned) */}
               {pinnedLinks.length > 0 && (
-                <section id="pinned" className="scroll-mt-6 space-y-4">
+                <section id="pinned" className="scroll-mt-6 space-y-4 content-visibility-auto">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
                       <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
@@ -2990,7 +2882,23 @@ function App() {
                     </DndContext>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      {pinnedLinks.map(link => renderLinkCard(link))}
+                      {pinnedLinks.map(link => (
+                        <LinkCard
+                          key={link.id}
+                          link={link}
+                          isDetailedView={isDetailedView}
+                          showDescription={siteSettings.showDescription !== false}
+                          showTags={siteSettings.showTags === true}
+                          openTarget={siteSettings.openTarget}
+                          isSelected={selectedLinks.has(link.id)}
+                          isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                          isBatchEditMode={isBatchEditMode}
+                          onToggleSelection={toggleLinkSelection}
+                          onContextMenu={handleContextMenu}
+                          onEdit={handleOpenEditModal}
+                          onTagClick={handleTagClick}
+                        />
+                      ))}
                     </div>
                   )}
                 </section>
@@ -2999,12 +2907,11 @@ function App() {
               {/* 全景分类流：所有分类依次纵向排列展示 */}
               {categories.filter(c => !c.parentId).map(cat => {
                 const subCats = categories.filter(c => c.parentId === cat.id);
-                const subCatIds = subCats.map(c => c.id);
                 const isLocked = isCategoryLocked(cat.id);
-                const catLinks = links.filter(l => l.categoryId === cat.id || subCatIds.includes(l.categoryId));
+                const catLinks = parentCategoryLinksMap.get(cat.id) || [];
 
                 return (
-                  <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-6 space-y-4">
+                  <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-6 space-y-4 content-visibility-auto">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center flex-wrap gap-2.5">
                         <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
@@ -3099,7 +3006,23 @@ function App() {
                       </DndContext>
                     ) : (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                        {catLinks.map(link => renderLinkCard(link))}
+                        {catLinks.map(link => (
+                          <LinkCard
+                            key={link.id}
+                            link={link}
+                            isDetailedView={isDetailedView}
+                            showDescription={siteSettings.showDescription !== false}
+                            showTags={siteSettings.showTags === true}
+                            openTarget={siteSettings.openTarget}
+                            isSelected={selectedLinks.has(link.id)}
+                            isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                            isBatchEditMode={isBatchEditMode}
+                            onToggleSelection={toggleLinkSelection}
+                            onContextMenu={handleContextMenu}
+                            onEdit={handleOpenEditModal}
+                            onTagClick={handleTagClick}
+                          />
+                        ))}
                       </div>
                     )}
                   </section>
