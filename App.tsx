@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame,
-  PanelLeftClose, PanelLeftOpen
+  PanelLeftClose, PanelLeftOpen, ChevronDown
 } from 'lucide-react';
 import {
   DndContext,
@@ -112,7 +112,6 @@ function App() {
   const [categories, setCategories] = useState<Category[]>(initialNavData.categories);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -804,7 +803,9 @@ function App() {
 
   const handleSelectAll = () => {
     // 获取当前显示的所有链接ID
-    const currentLinkIds = displayedLinks.map(link => link.id);
+    const currentLinkIds = searchQuery.trim() 
+      ? displayedLinks.map(link => link.id)
+      : links.filter(link => !isCategoryLocked(link.categoryId)).map(link => link.id);
     
     // 如果已选中的链接数量等于当前显示的链接数量，则取消全选
     if (selectedLinks.size === currentLinkIds.length && currentLinkIds.every(id => selectedLinks.has(id))) {
@@ -1503,6 +1504,12 @@ function App() {
       const current = selectedSearchSource || externalSearchSources.find(s => s.enabled) || DEFAULT_SEARCH_SOURCES[0];
       const searchUrl = current.url.replace('{query}', encodeURIComponent(searchQuery));
       window.open(searchUrl, siteSettings.openTarget === '_self' ? '_self' : '_blank');
+      return;
+    }
+    // 站内搜索模式：平滑滚动至搜索结果区域
+    const el = document.getElementById('search-results-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -1865,11 +1872,23 @@ function App() {
       });
   }, [links, categories, unlockedCategoryIds]);
 
-  // 预计算搜索字符串索引，避免每次按键对数千条数据进行重复 toLowerCase 与频繁内存分配
+  // 按照 order 升序预先排好 links，避免每次搜索筛选对上千条数据重复执行 sort()
+  const sortedLinks = useMemo(() => {
+    return [...links].sort((a, b) => {
+      const aOrder = a.order !== undefined ? a.order : a.createdAt;
+      const bOrder = b.order !== undefined ? b.order : b.createdAt;
+      return aOrder - bOrder;
+    });
+  }, [links]);
+
+  // 预计算搜索字符串索引，包括标题、URL、描述、表情、以及含 # 与不含 # 的全量标签
   const searchIndex = useMemo(() => {
     const map = new Map<string, string>();
     for (const l of links) {
-      const text = `${l.title} ${l.url} ${l.description || ''} ${l.emoji || ''} ${l.tags ? l.tags.join(' ') : ''}`.toLowerCase();
+      const tagStr = l.tags && l.tags.length > 0 
+        ? l.tags.map(t => `#${t.toLowerCase()} ${t.toLowerCase()}`).join(' ') 
+        : '';
+      const text = `${l.title} ${l.description || ''} ${tagStr} ${l.emoji || ''} ${l.url}`.toLowerCase();
       map.set(l.id, text);
     }
     return map;
@@ -1918,83 +1937,79 @@ function App() {
     return map;
   }, [links, categories]);
 
+  // 高性能搜索与标签筛选结果计算（毫秒级响应，预排序保持，空搜索立即返回空数组）
   const displayedLinks = useMemo(() => {
-    let result = links;
-    
-    // Security Filter: Always hide links from locked categories
-    result = result.filter(l => !isCategoryLocked(l.categoryId));
-
-    // Search Filter using deferredSearchQuery and searchIndex
-    const q = deferredSearchQuery.trim().toLowerCase();
-    if (q) {
-      result = result.filter(l => {
-        const text = searchIndex.get(l.id);
-        return text ? text.includes(q) : false;
-      });
+    const rawQ = searchQuery.trim();
+    if (!rawQ) {
+      return [];
     }
 
-    // Category Filter
+    const q = rawQ.toLowerCase();
+    
+    // 基础安全过滤：排除已加锁分类的链接
+    let result = sortedLinks.filter(l => !isCategoryLocked(l.categoryId));
+
+    // 分类筛选（如果在特定分类下搜索）
     if (selectedCategory !== 'all') {
-      // 获取当前分类及其所有子分类的ID
       const subCategoryIds = categories.filter(c => c.parentId === selectedCategory).map(c => c.id);
       result = result.filter(l => l.categoryId === selectedCategory || subCategoryIds.includes(l.categoryId));
     }
-    
-    // 按照order字段排序，如果没有order字段则按创建时间排序
-    // 修改排序逻辑：order值越大排在越前面，新增的卡片order值最大，会排在最前面
-    // 我们需要反转这个排序，让新增的卡片(order值最大)排在最后面
-    return result.sort((a, b) => {
-      const aOrder = a.order !== undefined ? a.order : a.createdAt;
-      const bOrder = b.order !== undefined ? b.order : b.createdAt;
-      // 改为升序排序，这样order值小(旧卡片)的排在前面，order值大(新卡片)的排在后面
-      return aOrder - bOrder;
-    });
-  }, [links, selectedCategory, deferredSearchQuery, categories, unlockedCategoryIds, searchIndex]);
 
-  // 计算其他目录的搜索结果
-  const otherCategoryResults = useMemo(() => {
-    const q = deferredSearchQuery.trim().toLowerCase();
-    if (!q || selectedCategory === 'all') {
-      return {};
+    // 1. 如果是以 '#' 开头的标签精准专精筛选（如 #AI、#工具）
+    if (q.startsWith('#')) {
+      const targetTag = q.slice(1).trim();
+      if (!targetTag) {
+        // 如果只输入了 '#'，匹配所有拥有标签的链接
+        return result.filter(l => Boolean(l.tags && l.tags.length > 0));
+      }
+      return result.filter(l => 
+        Boolean(l.tags && l.tags.some(t => t.toLowerCase() === targetTag || t.toLowerCase().includes(targetTag)))
+      );
     }
-    
-    // 获取其他目录中匹配的链接
-    const otherLinks = links.filter(link => {
-      // 排除当前目录的链接
-      if (link.categoryId === selectedCategory) {
-        return false;
-      }
-      
-      // 排除锁定的目录
-      if (isCategoryLocked(link.categoryId)) {
-        return false;
-      }
-      
-      // 搜索匹配
-      const text = searchIndex.get(link.id);
-      return text ? text.includes(q) : false;
+
+    // 2. 多关键词全文检索（支持空格分词，如 "ai 工具"）
+    const keywords = q.split(/\s+/).filter(Boolean);
+    if (keywords.length === 0) return [];
+
+    return result.filter(l => {
+      const text = searchIndex.get(l.id);
+      if (!text) return false;
+      return keywords.every(kw => text.includes(kw));
     });
+  }, [sortedLinks, selectedCategory, searchQuery, categories, unlockedCategoryIds, searchIndex]);
 
-    // 按目录分组
-    const groupedByCategory = otherLinks.reduce((acc, link) => {
-      if (!acc[link.categoryId]) {
-        acc[link.categoryId] = [];
+  // 搜索结果渐进式分页（避免海量搜索结果导致 DOM 节点暴增与渲染卡顿）
+  const SEARCH_PAGE_SIZE = 48;
+  const [visibleSearchCount, setVisibleSearchCount] = useState(SEARCH_PAGE_SIZE);
+  const searchSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // 搜索词改变时重置分页展示数量
+  useEffect(() => {
+    setVisibleSearchCount(SEARCH_PAGE_SIZE);
+  }, [searchQuery]);
+
+  const visibleSearchLinks = useMemo(() => {
+    return displayedLinks.slice(0, visibleSearchCount);
+  }, [displayedLinks, visibleSearchCount]);
+
+  const hasMoreSearchResults = displayedLinks.length > visibleSearchCount;
+
+  const handleLoadMoreSearch = useCallback(() => {
+    setVisibleSearchCount(prev => Math.min(prev + SEARCH_PAGE_SIZE, displayedLinks.length));
+  }, [displayedLinks.length]);
+
+  // 滚动触底自动加载下一批搜索卡片
+  useEffect(() => {
+    if (!hasMoreSearchResults || !searchSentinelRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        handleLoadMoreSearch();
       }
-      acc[link.categoryId].push(link);
-      return acc;
-    }, {} as Record<string, LinkItem[]>);
+    }, { rootMargin: '400px' });
 
-    // 对每个目录内的链接进行排序
-    Object.keys(groupedByCategory).forEach(categoryId => {
-      groupedByCategory[categoryId].sort((a, b) => {
-        const aOrder = a.order !== undefined ? a.order : a.createdAt;
-        const bOrder = b.order !== undefined ? b.order : b.createdAt;
-        return aOrder - bOrder;
-      });
-    });
-
-    return groupedByCategory;
-  }, [links, selectedCategory, deferredSearchQuery, categories, unlockedCategoryIds, searchIndex]);
+    observer.observe(searchSentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMoreSearchResults, handleLoadMoreSearch]);
 
 
   // --- Render Components ---
@@ -2118,7 +2133,9 @@ function App() {
   }, []);
 
   const handleTagClick = useCallback((tag: string) => {
-    setSearchQuery(tag);
+    setSearchMode('internal');
+    setSearchQuery(prev => prev === '#' + tag ? '' : '#' + tag);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const isDetailedView = siteSettings.cardStyle === 'detailed';
@@ -2815,39 +2832,63 @@ function App() {
               {/* 热搜关键词 part-search-keywords：强制单行不折行 */}
               {topHotTags.length > 0 && (
                 <div className="search-keywords part-search-keywords flex flex-nowrap whitespace-nowrap items-center justify-center gap-1.5 sm:gap-2 text-[12px] text-white overflow-x-auto no-scrollbar max-w-full" style={{ lineHeight: '2.5em' }}>
-                  {topHotTags.slice(0, 8).map(tag => (
-                    <span
-                      key={tag}
-                      onClick={() => {
-                        setSearchMode('internal');
-                        setSearchQuery(tag);
-                      }}
-                      className="item shrink-0 inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all text-white hover:text-white bg-white/20 hover:bg-white/30 dark:bg-slate-800/90 dark:hover:bg-slate-700 dark:text-slate-200 dark:border dark:border-slate-700/60 whitespace-nowrap select-none"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
+                  {topHotTags.slice(0, 8).map(tag => {
+                    const isTagActive = searchQuery.trim() === '#' + tag || searchQuery.trim() === tag;
+                    return (
+                      <span
+                        key={tag}
+                        onClick={() => {
+                          setSearchMode('internal');
+                          if (isTagActive) {
+                            setSearchQuery('');
+                          } else {
+                            setSearchQuery('#' + tag);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`item shrink-0 inline-block px-2.5 py-0.5 rounded cursor-pointer transition-all whitespace-nowrap select-none ${
+                          isTagActive
+                            ? 'bg-white text-blue-600 dark:bg-blue-600 dark:text-white font-bold shadow-sm scale-105'
+                            : 'text-white hover:text-white bg-white/20 hover:bg-white/30 dark:bg-slate-800/90 dark:hover:bg-slate-700 dark:text-slate-200 dark:border dark:border-slate-700/60'
+                        }`}
+                        title={isTagActive ? `取消筛选 #${tag}` : `按标签 #${tag} 筛选`}
+                      >
+                        #{tag}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
-          {/* 搜索视图：当用户输入搜索词时展示全局匹配结果 */}
+          {/* 搜索视图：当用户输入搜索词时展示全局匹配结果（支持渐进式极速渲染） */}
           {searchQuery.trim() ? (
-            <section className="space-y-4">
+            <section id="search-results-section" className="space-y-4 content-visibility-auto">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
                   <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                    搜索结果
+                    {searchQuery.trim().startsWith('#') ? (
+                      <span className="flex items-center gap-1.5">
+                        <span>标签筛选</span>
+                        <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full">
+                          {searchQuery.trim()}
+                        </span>
+                      </span>
+                    ) : (
+                      <span>搜索结果</span>
+                    )}
                   </h2>
                   <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full border border-blue-100 dark:border-blue-800/40">
-                    {displayedLinks.length}
+                    {displayedLinks.length > visibleSearchCount 
+                      ? `${visibleSearchLinks.length} / ${displayedLinks.length}`
+                      : displayedLinks.length}
                   </span>
                 </div>
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                 >
                   清空搜索
                 </button>
@@ -2856,28 +2897,46 @@ function App() {
               {displayedLinks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
                   <Search size={40} className="opacity-30 mb-4" />
-                  <p className="text-sm">没有找到相关内容</p>
+                  <p className="text-sm">没有找到与 "{searchQuery.trim()}" 相关的内容</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {displayedLinks.map(link => (
-                    <LinkCard
-                      key={link.id}
-                      link={link}
-                      isDetailedView={isDetailedView}
-                      showDescription={siteSettings.showDescription !== false}
-                      showTags={siteSettings.showTags === true}
-                      openTarget={siteSettings.openTarget}
-                      isSelected={selectedLinks.has(link.id)}
-                      isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
-                      isBatchEditMode={isBatchEditMode}
-                      onToggleSelection={toggleLinkSelection}
-                      onContextMenu={handleContextMenu}
-                      onEdit={handleOpenEditModal}
-                      onTagClick={handleTagClick}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {visibleSearchLinks.map(link => (
+                      <LinkCard
+                        key={link.id}
+                        link={link}
+                        isDetailedView={isDetailedView}
+                        showDescription={siteSettings.showDescription !== false}
+                        showTags={siteSettings.showTags === true}
+                        openTarget={siteSettings.openTarget}
+                        isSelected={selectedLinks.has(link.id)}
+                        isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+                        isBatchEditMode={isBatchEditMode}
+                        onToggleSelection={toggleLinkSelection}
+                        onContextMenu={handleContextMenu}
+                        onEdit={handleOpenEditModal}
+                        onTagClick={handleTagClick}
+                      />
+                    ))}
+                  </div>
+
+                  {/* 渐进式分页加载控制区 */}
+                  {hasMoreSearchResults && (
+                    <div className="pt-6 pb-2 flex flex-col items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleLoadMoreSearch}
+                        className="px-5 py-2 text-xs font-medium bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-full shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>加载更多</span>
+                        <span className="text-slate-400">({visibleSearchLinks.length} / {displayedLinks.length})</span>
+                        <ChevronDown size={14} />
+                      </button>
+                      <div ref={searchSentinelRef} className="h-4 w-full" />
+                    </div>
+                  )}
+                </>
               )}
             </section>
           ) : (
