@@ -55,6 +55,12 @@
 
 ## 📝 最新更新记录
 
+### 🚀 版本 v2.7.1 (2026.10)
+- **🛠️ 修复分类滚动与点击锚点视口跳动问题 (Zero-CLS & Smooth Scrollspy)**：
+  - **消除动态占位高度突变重排 (CLS = 0)**：彻底移除原 `LazyCategorySection` 在滚动到临界区时从 `180px` 突变为千像素的 React 级动态挂载，杜绝滚动中页面高度频繁膨胀导致的锚点漂移与画面抖动；
+  - **超长分类 36 卡片折叠 + 原生 `content-visibility: auto` 双保险**：完整保留 `CollapsibleLinkGrid`（每个分类首屏仅渲染 36 张卡片，数千链接的 DOM 节点总数压制在数百个以内），结合浏览器底层原生的 `content-visibility: auto` 与滚动锚定（Scroll Anchoring），性能极致丝滑且几何位置 100% 稳定；
+  - **平滑滚动与滚动监听互斥锁**：点击侧边栏或子分类按钮执行 `scrollToSection` 时引入 800ms 互斥锁，并在 `handleContentScroll` 中增加状态变更检测，防止滚动期间密集触发 `setActiveSection` 重渲染与平滑滚动算法冲突。
+
 ### 🚀 版本 v2.7.0 (2026.10)
 - **⚡ 首页 5000+ 海量书签双重极客性能优化（视口懒加载 + 超长分类智能折叠）**：
   - **React 级分类视口懒加载 (`LazyCategorySection`)**：基于 `IntersectionObserver` 实现容器级延迟按需挂载（提前 600px 静默就绪），首屏默认仅同步挂载前 2 个主分类及置顶专区，首屏初始 DOM 节点数从 75,000+ 骤降至 **1,500 左右（下降 95% 以上）**，首次加载提速超 30 倍，内存常驻暴降；

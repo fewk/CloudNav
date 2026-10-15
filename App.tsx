@@ -116,9 +116,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
 
-  // 首页超长分类折叠与视口懒加载状态
+  // 首页超长分类折叠状态 (阈值 CATEGORY_COLLAPSE_THRESHOLD = 36)
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(() => new Set());
-  const [mountedCategoryIds, setMountedCategoryIds] = useState<Set<string>>(() => new Set());
 
   const toggleCategoryExpanded = useCallback((catId: string) => {
     setExpandedCategoryIds(prev => {
@@ -132,29 +131,9 @@ function App() {
     });
   }, []);
 
-  const markCategoryMounted = useCallback((catId: string) => {
-    setMountedCategoryIds(prev => {
-      if (prev.has(catId)) return prev;
-      const next = new Set(prev);
-      next.add(catId);
-      return next;
-    });
-  }, []);
-
-  // 首屏前 2 个主分类默认初始同步挂载，保证首页秒开无任何闪烁
-  useEffect(() => {
-    if (categories.length > 0) {
-      setMountedCategoryIds(prev => {
-        const next = new Set(prev);
-        const topCats = categories.filter(c => !c.parentId).slice(0, 2);
-        topCats.forEach(c => {
-          next.add(c.id);
-          categories.filter(sub => sub.parentId === c.id).forEach(sub => next.add(sub.id));
-        });
-        return next;
-      });
-    }
-  }, [categories]);
+  // 避免平滑滚动过程中 scrollspy 误触发跳动
+  const isManualScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -1557,6 +1536,7 @@ function App() {
 
   // 滚动监听
   const handleContentScroll = () => {
+    if (isManualScrollingRef.current) return;
     if (!contentScrollRef.current) return;
     const container = contentScrollRef.current;
     const scrollY = container.scrollTop;
@@ -1571,46 +1551,43 @@ function App() {
       }
     }
     
+    let currentActive = activeSection;
     for (const secId of sectionIds) {
       const el = document.getElementById(secId);
       if (el) {
         const top = el.offsetTop - container.offsetTop;
         if (top <= scrollY + 140) {
-          setActiveSection(secId);
+          currentActive = secId;
         }
       }
+    }
+    if (currentActive !== activeSection) {
+      setActiveSection(currentActive);
     }
   };
 
   // 锚点平滑滚动
   const scrollToSection = (targetId: string) => {
-    // 强制挂载并展开目标分类，确保锚点容器高度与内部节点已完全就绪
-    const pureCatId = targetId.startsWith('cat-') ? targetId.replace('cat-', '') : targetId;
-    if (pureCatId && pureCatId !== 'pinned') {
-      setMountedCategoryIds(prev => new Set(prev).add(pureCatId));
-      setExpandedCategoryIds(prev => new Set(prev).add(pureCatId));
-    }
+    isManualScrollingRef.current = true;
+    setActiveSection(targetId);
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      isManualScrollingRef.current = false;
+    }, 800);
+
+    const doScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.history.replaceState(null, '', `#${targetId}`);
+      }
+    };
 
     if (searchQuery.trim()) {
       setSearchQuery('');
-      // 若处于搜索结果态，等状态清空切回主分类流后再执行平滑滚动
-      setTimeout(() => {
-        const el = document.getElementById(targetId);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          window.history.replaceState(null, '', `#${targetId}`);
-          setActiveSection(targetId);
-        }
-      }, 50);
+      setTimeout(doScroll, 50);
     } else {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(targetId);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          window.history.replaceState(null, '', `#${targetId}`);
-          setActiveSection(targetId);
-        }
-      });
+      doScroll();
     }
     setSidebarOpen(false);
   };
@@ -2196,47 +2173,6 @@ function App() {
     if (currentCat?.parentId) return false;
     return categories.some(c => c.parentId === selectedCategory);
   }, [selectedCategory, categories]);
-
-  // 视口懒加载观察器容器组件
-  const LazyCategorySection: React.FC<{
-    id: string;
-    isMounted: boolean;
-    onMount: () => void;
-    className?: string;
-    children: React.ReactNode;
-  }> = ({ id, isMounted, onMount, className = '', children }) => {
-    const sectionRef = useRef<HTMLElement | null>(null);
-
-    useEffect(() => {
-      if (isMounted || !sectionRef.current) return;
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting) {
-            onMount();
-            observer.disconnect();
-          }
-        },
-        { rootMargin: '600px 0px' }
-      );
-      observer.observe(sectionRef.current);
-      return () => observer.disconnect();
-    }, [isMounted, onMount]);
-
-    return (
-      <section
-        ref={sectionRef}
-        id={id}
-        className={className}
-        style={{ minHeight: isMounted ? undefined : '180px' }}
-      >
-        {isMounted ? children : (
-          <div className="py-12 flex items-center justify-center text-slate-300 dark:text-slate-600">
-            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
-          </div>
-        )}
-      </section>
-    );
-  };
 
   // 分类卡片折叠与展开网格组件（超过 36 个卡片自动折叠收拢）
   const CollapsibleLinkGrid: React.FC<{
@@ -3181,14 +3117,9 @@ function App() {
                 const catLinks = parentCategoryLinksMap.get(cat.id) || [];
 
                 return (
-                  <LazyCategorySection 
+                  <section 
                     key={cat.id} 
                     id={`cat-${cat.id}`} 
-                    isMounted={mountedCategoryIds.has(cat.id) || isSortingMode === cat.id}
-                    onMount={() => {
-                      markCategoryMounted(cat.id);
-                      subCats.forEach(sub => markCategoryMounted(sub.id));
-                    }}
                     className="scroll-mt-6 space-y-4 content-visibility-auto"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -3370,7 +3301,7 @@ function App() {
                         })}
                       </div>
                     )}
-                  </LazyCategorySection>
+                  </section>
                 );
               })}
             </>
