@@ -1098,12 +1098,11 @@ function App() {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      // 获取当前分类下的所有链接（包括子分类）
-      const subCategoryIds = categories.filter(c => c.parentId === selectedCategory).map(c => c.id);
+      // 获取当前正在排序分类下的所有链接（包括子分类）
+      const currentCatId = isSortingMode || selectedCategory;
+      const subCategoryIds = categories.filter(c => c.parentId === currentCatId).map(c => c.id);
       const categoryLinks = links.filter(link => 
-        selectedCategory === 'all' || 
-        link.categoryId === selectedCategory || 
-        subCategoryIds.includes(link.categoryId)
+        (currentCatId === 'all') ? true : (link.categoryId === currentCatId || subCategoryIds.includes(link.categoryId))
       );
       
       // 找到被拖拽元素和目标元素的索引
@@ -1230,6 +1229,17 @@ function App() {
     if (!authToken) { setIsAuthOpen(true); return; }
     if (confirm('确定删除此链接吗?')) {
       updateData(links.filter(l => l.id !== id), categories);
+    }
+  };
+
+  const handleDeleteLinkInSorting = (linkToDelete: LinkItem) => {
+    if (!authToken) { 
+      setIsAuthOpen(true); 
+      return; 
+    }
+    if (window.confirm(`确定要彻底删除链接 "${linkToDelete.title}" 吗？此操作无法撤销。`)) {
+      const newLinks = links.filter(l => l.id !== linkToDelete.id);
+      updateData(newLinks, categories);
     }
   };
 
@@ -2029,10 +2039,10 @@ function App() {
         {...listeners}
       >
         <div className={`flex flex-1 min-w-0 overflow-hidden ${
-          isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
+          isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full pr-7'
         }`}>
           {/* 第一行：图标和标题 */}
-          <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
+          <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3 pr-7' : 'w-full min-w-0 flex-1'}`}>
             <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
               isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
             }`}>
@@ -2078,6 +2088,25 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* 排序模式下的快捷删除按钮 */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDeleteLinkInSorting(link);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className={`absolute w-6 h-6 flex items-center justify-center rounded-full bg-red-50 hover:bg-red-500 text-red-500 hover:text-white border border-red-200 dark:border-red-800/80 dark:bg-red-950/60 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white transition-all shadow-sm hover:scale-110 active:scale-95 z-30 cursor-pointer ${
+            isDetailedView ? 'top-2.5 right-2.5' : 'top-1/2 -translate-y-1/2 right-2.5'
+          }`}
+          title={`快捷删除 "${link.title}"`}
+        >
+          <Trash2 size={12} />
+        </button>
       </div>
     );
   };
@@ -2867,7 +2896,10 @@ function App() {
                       </span>
                     </div>
                     {isSortingPinned ? (
-                      <div className="flex gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="hidden sm:inline text-xs text-blue-600 dark:text-blue-400 font-medium mr-1 select-none">
+                          拖拽排序 · 点击 🗑️ 快捷删除
+                        </span>
                         <button 
                           onClick={savePinnedSorting}
                           className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
@@ -2998,7 +3030,10 @@ function App() {
                       {authToken && !isLocked && (
                         <div className="flex items-center gap-2">
                           {isSortingMode === cat.id ? (
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="hidden sm:inline text-xs text-blue-600 dark:text-blue-400 font-medium mr-1 select-none">
+                                拖拽排序 · 点击 🗑️ 快捷删除
+                              </span>
                               <button 
                                 onClick={saveSorting}
                                 className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-full transition-colors"
