@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame,
-  PanelLeftClose, PanelLeftOpen, ChevronDown
+  PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp
 } from 'lucide-react';
 import {
   DndContext,
@@ -103,6 +103,8 @@ function getInitialSearchConfig(): { mode: SearchMode; sources: ExternalSearchSo
   };
 }
 
+const CATEGORY_COLLAPSE_THRESHOLD = 36;
+
 function App() {
   const initialNavData = useMemo(() => getInitialNavData(), []);
   const initialSearch = useMemo(() => getInitialSearchConfig(), []);
@@ -113,6 +115,46 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
+
+  // 首页超长分类折叠与视口懒加载状态
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(() => new Set());
+  const [mountedCategoryIds, setMountedCategoryIds] = useState<Set<string>>(() => new Set());
+
+  const toggleCategoryExpanded = useCallback((catId: string) => {
+    setExpandedCategoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(catId)) {
+        next.delete(catId);
+      } else {
+        next.add(catId);
+      }
+      return next;
+    });
+  }, []);
+
+  const markCategoryMounted = useCallback((catId: string) => {
+    setMountedCategoryIds(prev => {
+      if (prev.has(catId)) return prev;
+      const next = new Set(prev);
+      next.add(catId);
+      return next;
+    });
+  }, []);
+
+  // 首屏前 2 个主分类默认初始同步挂载，保证首页秒开无任何闪烁
+  useEffect(() => {
+    if (categories.length > 0) {
+      setMountedCategoryIds(prev => {
+        const next = new Set(prev);
+        const topCats = categories.filter(c => !c.parentId).slice(0, 2);
+        topCats.forEach(c => {
+          next.add(c.id);
+          categories.filter(sub => sub.parentId === c.id).forEach(sub => next.add(sub.id));
+        });
+        return next;
+      });
+    }
+  }, [categories]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -1542,6 +1584,13 @@ function App() {
 
   // 锚点平滑滚动
   const scrollToSection = (targetId: string) => {
+    // 强制挂载并展开目标分类，确保锚点容器高度与内部节点已完全就绪
+    const pureCatId = targetId.startsWith('cat-') ? targetId.replace('cat-', '') : targetId;
+    if (pureCatId && pureCatId !== 'pinned') {
+      setMountedCategoryIds(prev => new Set(prev).add(pureCatId));
+      setExpandedCategoryIds(prev => new Set(prev).add(pureCatId));
+    }
+
     if (searchQuery.trim()) {
       setSearchQuery('');
       // 若处于搜索结果态，等状态清空切回主分类流后再执行平滑滚动
@@ -1554,12 +1603,14 @@ function App() {
         }
       }, 50);
     } else {
-      const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.history.replaceState(null, '', `#${targetId}`);
-        setActiveSection(targetId);
-      }
+      requestAnimationFrame(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.history.replaceState(null, '', `#${targetId}`);
+          setActiveSection(targetId);
+        }
+      });
     }
     setSidebarOpen(false);
   };
@@ -2145,6 +2196,116 @@ function App() {
     if (currentCat?.parentId) return false;
     return categories.some(c => c.parentId === selectedCategory);
   }, [selectedCategory, categories]);
+
+  // 视口懒加载观察器容器组件
+  const LazyCategorySection: React.FC<{
+    id: string;
+    isMounted: boolean;
+    onMount: () => void;
+    className?: string;
+    children: React.ReactNode;
+  }> = ({ id, isMounted, onMount, className = '', children }) => {
+    const sectionRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+      if (isMounted || !sectionRef.current) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            onMount();
+            observer.disconnect();
+          }
+        },
+        { rootMargin: '600px 0px' }
+      );
+      observer.observe(sectionRef.current);
+      return () => observer.disconnect();
+    }, [isMounted, onMount]);
+
+    return (
+      <section
+        ref={sectionRef}
+        id={id}
+        className={className}
+        style={{ minHeight: isMounted ? undefined : '180px' }}
+      >
+        {isMounted ? children : (
+          <div className="py-12 flex items-center justify-center text-slate-300 dark:text-slate-600">
+            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  // 分类卡片折叠与展开网格组件（超过 36 个卡片自动折叠收拢）
+  const CollapsibleLinkGrid: React.FC<{
+    categoryId: string;
+    links: LinkItem[];
+    isSorting: boolean;
+  }> = ({ categoryId, links, isSorting }) => {
+    const isExpanded = expandedCategoryIds.has(categoryId);
+    const shouldCollapse = !isSorting && links.length > CATEGORY_COLLAPSE_THRESHOLD && !isExpanded;
+    const renderLinks = shouldCollapse ? links.slice(0, CATEGORY_COLLAPSE_THRESHOLD) : links;
+
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {renderLinks.map(link => (
+            <LinkCard
+              key={link.id}
+              link={link}
+              isDetailedView={isDetailedView}
+              showDescription={siteSettings.showDescription !== false}
+              showTags={siteSettings.showTags === true}
+              openTarget={siteSettings.openTarget}
+              isSelected={selectedLinks.has(link.id)}
+              isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
+              isBatchEditMode={isBatchEditMode}
+              onToggleSelection={toggleLinkSelection}
+              onContextMenu={handleContextMenu}
+              onEdit={handleOpenEditModal}
+              onTagClick={handleTagClick}
+            />
+          ))}
+        </div>
+
+        {/* 超量折叠时的“展开全部 / 收起”操作按钮 */}
+        {!isSorting && links.length > CATEGORY_COLLAPSE_THRESHOLD && (
+          <div className="pt-2 pb-1 flex justify-center">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleCategoryExpanded(categoryId);
+              }}
+              className="px-4 py-1.5 text-xs font-medium rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 shadow-xs hover:shadow-sm transition-all flex items-center gap-1.5 cursor-pointer select-none"
+              title={shouldCollapse ? `展开全部 ${links.length} 个链接` : '收起部分链接'}
+            >
+              {shouldCollapse ? (
+                <>
+                  <span>展开全部</span>
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">
+                    (已展示 {CATEGORY_COLLAPSE_THRESHOLD} / {links.length})
+                  </span>
+                  <ChevronDown size={13} />
+                </>
+              ) : (
+                <>
+                  <span>收起</span>
+                  <span className="text-slate-400 dark:text-slate-500 font-normal">
+                    (共 {links.length} 个)
+                  </span>
+                  <ChevronUp size={13} />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-screen overflow-hidden text-slate-900 dark:text-slate-50">
@@ -3004,25 +3165,11 @@ function App() {
                       </SortableContext>
                     </DndContext>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      {pinnedLinks.map(link => (
-                        <LinkCard
-                          key={link.id}
-                          link={link}
-                          isDetailedView={isDetailedView}
-                          showDescription={siteSettings.showDescription !== false}
-                          showTags={siteSettings.showTags === true}
-                          openTarget={siteSettings.openTarget}
-                          isSelected={selectedLinks.has(link.id)}
-                          isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
-                          isBatchEditMode={isBatchEditMode}
-                          onToggleSelection={toggleLinkSelection}
-                          onContextMenu={handleContextMenu}
-                          onEdit={handleOpenEditModal}
-                          onTagClick={handleTagClick}
-                        />
-                      ))}
-                    </div>
+                    <CollapsibleLinkGrid
+                      categoryId="pinned"
+                      links={pinnedLinks}
+                      isSorting={isSortingPinned}
+                    />
                   )}
                 </section>
               )}
@@ -3034,7 +3181,16 @@ function App() {
                 const catLinks = parentCategoryLinksMap.get(cat.id) || [];
 
                 return (
-                  <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-6 space-y-4 content-visibility-auto">
+                  <LazyCategorySection 
+                    key={cat.id} 
+                    id={`cat-${cat.id}`} 
+                    isMounted={mountedCategoryIds.has(cat.id) || isSortingMode === cat.id}
+                    onMount={() => {
+                      markCategoryMounted(cat.id);
+                      subCats.forEach(sub => markCategoryMounted(sub.id));
+                    }}
+                    className="scroll-mt-6 space-y-4 content-visibility-auto"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center flex-wrap gap-2.5">
                         <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
@@ -3151,49 +3307,21 @@ function App() {
                         </SortableContext>
                       </DndContext>
                     ) : subCats.length === 0 ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                        {catLinks.map(link => (
-                          <LinkCard
-                            key={link.id}
-                            link={link}
-                            isDetailedView={isDetailedView}
-                            showDescription={siteSettings.showDescription !== false}
-                            showTags={siteSettings.showTags === true}
-                            openTarget={siteSettings.openTarget}
-                            isSelected={selectedLinks.has(link.id)}
-                            isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
-                            isBatchEditMode={isBatchEditMode}
-                            onToggleSelection={toggleLinkSelection}
-                            onContextMenu={handleContextMenu}
-                            onEdit={handleOpenEditModal}
-                            onTagClick={handleTagClick}
-                          />
-                        ))}
-                      </div>
+                      <CollapsibleLinkGrid
+                        categoryId={cat.id}
+                        links={catLinks}
+                        isSorting={isSortingMode === cat.id}
+                      />
                     ) : (
                       <div className="space-y-6">
                         {/* 1. 一级分类直属链接 (若存在) */}
                         {(directCategoryLinksMap.get(cat.id)?.length || 0) > 0 && (
                           <div className="space-y-3">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                              {directCategoryLinksMap.get(cat.id)!.map(link => (
-                                <LinkCard
-                                  key={link.id}
-                                  link={link}
-                                  isDetailedView={isDetailedView}
-                                  showDescription={siteSettings.showDescription !== false}
-                                  showTags={siteSettings.showTags === true}
-                                  openTarget={siteSettings.openTarget}
-                                  isSelected={selectedLinks.has(link.id)}
-                                  isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
-                                  isBatchEditMode={isBatchEditMode}
-                                  onToggleSelection={toggleLinkSelection}
-                                  onContextMenu={handleContextMenu}
-                                  onEdit={handleOpenEditModal}
-                                  onTagClick={handleTagClick}
-                                />
-                              ))}
-                            </div>
+                            <CollapsibleLinkGrid
+                              categoryId={cat.id}
+                              links={directCategoryLinksMap.get(cat.id)!}
+                              isSorting={isSortingMode === cat.id}
+                            />
                           </div>
                         )}
 
@@ -3231,32 +3359,18 @@ function App() {
                                   暂无链接
                                 </div>
                               ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                                  {subLinks.map(link => (
-                                    <LinkCard
-                                      key={link.id}
-                                      link={link}
-                                      isDetailedView={isDetailedView}
-                                      showDescription={siteSettings.showDescription !== false}
-                                      showTags={siteSettings.showTags === true}
-                                      openTarget={siteSettings.openTarget}
-                                      isSelected={selectedLinks.has(link.id)}
-                                      isUnassignedHighlight={isSelectedCategoryParentWithChildren && link.categoryId === selectedCategory}
-                                      isBatchEditMode={isBatchEditMode}
-                                      onToggleSelection={toggleLinkSelection}
-                                      onContextMenu={handleContextMenu}
-                                      onEdit={handleOpenEditModal}
-                                      onTagClick={handleTagClick}
-                                    />
-                                  ))}
-                                </div>
+                                <CollapsibleLinkGrid
+                                  categoryId={sub.id}
+                                  links={subLinks}
+                                  isSorting={isSortingMode === cat.id}
+                                />
                               )}
                             </div>
                           );
                         })}
                       </div>
                     )}
-                  </section>
+                  </LazyCategorySection>
                 );
               })}
             </>
