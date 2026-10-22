@@ -25,4 +25,10 @@ body {
   pointer-events: none;
 }
 
+/* Viewport lazy rendering for high-performance section rendering */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
 

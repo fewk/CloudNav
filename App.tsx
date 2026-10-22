@@ -1534,64 +1534,96 @@ function App() {
     }
   };
 
-  // 滚动监听
-  const handleContentScroll = () => {
-    if (isManualScrollingRef.current) return;
-    if (!contentScrollRef.current) return;
-    const container = contentScrollRef.current;
-    const containerRect = container.getBoundingClientRect();
-    
-    // 按 DOM 纵向渲染顺序收集所有锚点 ID（包含置顶、父分类及各子分类）
-    const sectionIds: string[] = ['pinned'];
+  // 缓存纵向渲染顺序的所有锚点 ID（包含置顶、父分类及各子分类）
+  const sectionIds = useMemo(() => {
+    const ids: string[] = ['pinned'];
     for (const cat of categories.filter(c => !c.parentId)) {
-      sectionIds.push(`cat-${cat.id}`);
+      ids.push(`cat-${cat.id}`);
       const subCats = categories.filter(c => c.parentId === cat.id);
       for (const sub of subCats) {
-        sectionIds.push(`cat-${sub.id}`);
+        ids.push(`cat-${sub.id}`);
       }
     }
-    
-    let currentActive = activeSection;
-    for (const secId of sectionIds) {
-      const el = document.getElementById(secId);
-      if (el) {
-        const top = el.getBoundingClientRect().top - containerRect.top;
-        if (top <= 140) {
-          currentActive = secId;
+    return ids;
+  }, [categories]);
+
+  const rafIdRef = useRef<number | null>(null);
+
+  // 滚动监听（requestAnimationFrame 严格节流 + 轻量 offsetTop，彻底杜绝同步重排与主线程卡顿）
+  const handleContentScroll = () => {
+    if (isManualScrollingRef.current) return;
+    if (rafIdRef.current !== null) return;
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      if (!contentScrollRef.current || isManualScrollingRef.current) return;
+      const container = contentScrollRef.current;
+      const scrollY = container.scrollTop;
+
+      let currentActive = activeSection;
+      for (const secId of sectionIds) {
+        const el = document.getElementById(secId);
+        if (el) {
+          const top = el.offsetTop - container.offsetTop;
+          if (top <= scrollY + 140) {
+            currentActive = secId;
+          }
         }
       }
-    }
-    if (currentActive !== activeSection) {
-      setActiveSection(currentActive);
-    }
+      if (currentActive !== activeSection) {
+        setActiveSection(currentActive);
+      }
+    });
   };
 
-  // 锚点平滑滚动
+  // 锚点平滑滚动（智能自校准单次直达，完美兼容 content-visibility 动态展开）
   const scrollToSection = (targetId: string) => {
     isManualScrollingRef.current = true;
     setActiveSection(targetId);
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      isManualScrollingRef.current = false;
-    }, 1000);
 
     const doScroll = () => {
-      const el = document.getElementById(targetId);
-      if (el) {
-        if (contentScrollRef.current) {
-          const container = contentScrollRef.current;
-          const containerRect = container.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - 24;
-          container.scrollTo({
-            top: Math.max(0, targetScrollTop),
-            behavior: 'smooth'
-          });
-        } else {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const container = contentScrollRef.current;
+      if (!container) return;
+
+      const startTime = performance.now();
+      const maxDuration = 1200; // 最多 1.2 秒内自动平滑推进到位
+
+      const checkAndScroll = () => {
+        const el = document.getElementById(targetId);
+        const c = contentScrollRef.current;
+        if (!el || !c) {
+          isManualScrollingRef.current = false;
+          return;
         }
-        window.history.replaceState(null, '', `#${targetId}`);
-      }
+
+        const cRect = c.getBoundingClientRect();
+        const eRect = el.getBoundingClientRect();
+        const diff = eRect.top - cRect.top - 24;
+
+        // 判断是否已到位（允许 4px 容差）或已触底/触顶
+        const isAtBottom = Math.abs(c.scrollHeight - c.clientHeight - c.scrollTop) < 4;
+        const isAtTop = c.scrollTop <= 0;
+
+        if (Math.abs(diff) <= 4 || (diff > 0 && isAtBottom) || (diff < 0 && isAtTop)) {
+          isManualScrollingRef.current = false;
+          window.history.replaceState(null, '', `#${targetId}`);
+          return;
+        }
+
+        // 持续微调平滑推进
+        c.scrollBy({ top: diff, behavior: 'smooth' });
+
+        // 若尚未收敛且未超时，在 180ms 后再次校验并推进
+        if (performance.now() - startTime < maxDuration) {
+          scrollTimeoutRef.current = setTimeout(checkAndScroll, 180);
+        } else {
+          isManualScrollingRef.current = false;
+          window.history.replaceState(null, '', `#${targetId}`);
+        }
+      };
+
+      checkAndScroll();
     };
 
     if (searchQuery.trim()) {
@@ -3156,7 +3188,7 @@ function App() {
                   <section 
                     key={cat.id} 
                     id={`cat-${cat.id}`} 
-                    className="scroll-mt-6 space-y-4"
+                    className="scroll-mt-6 space-y-4 content-visibility-auto"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center flex-wrap gap-2.5">
