@@ -1539,7 +1539,7 @@ function App() {
     if (isManualScrollingRef.current) return;
     if (!contentScrollRef.current) return;
     const container = contentScrollRef.current;
-    const scrollY = container.scrollTop;
+    const containerRect = container.getBoundingClientRect();
     
     // 按 DOM 纵向渲染顺序收集所有锚点 ID（包含置顶、父分类及各子分类）
     const sectionIds: string[] = ['pinned'];
@@ -1555,8 +1555,8 @@ function App() {
     for (const secId of sectionIds) {
       const el = document.getElementById(secId);
       if (el) {
-        const top = el.offsetTop - container.offsetTop;
-        if (top <= scrollY + 140) {
+        const top = el.getBoundingClientRect().top - containerRect.top;
+        if (top <= 140) {
           currentActive = secId;
         }
       }
@@ -1573,12 +1573,23 @@ function App() {
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
       isManualScrollingRef.current = false;
-    }, 800);
+    }, 1000);
 
     const doScroll = () => {
       const el = document.getElementById(targetId);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (contentScrollRef.current) {
+          const container = contentScrollRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - 24;
+          container.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: 'smooth'
+          });
+        } else {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
         window.history.replaceState(null, '', `#${targetId}`);
       }
     };
@@ -1591,6 +1602,31 @@ function App() {
     }
     setSidebarOpen(false);
   };
+
+  // 支持 URL Hash 锚点自动精准滚动（如直接访问链接带 #cat-xxx 或浏览器前进/后退）
+  useEffect(() => {
+    const rawHash = window.location.hash.replace(/^#/, '');
+    if (rawHash && categories.length > 0) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(rawHash);
+        if (el) {
+          scrollToSection(rawHash);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [categories.length]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const rawHash = window.location.hash.replace(/^#/, '');
+      if (rawHash) {
+        scrollToSection(rawHash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // 处理搜索源选择
   const handleSearchSourceSelect = (source: ExternalSearchSource) => {
@@ -2961,7 +2997,7 @@ function App() {
 
           {/* 搜索视图：当用户输入搜索词时展示全局匹配结果（支持渐进式极速渲染） */}
           {searchQuery.trim() ? (
-            <section id="search-results-section" className="space-y-4 content-visibility-auto">
+            <section id="search-results-section" className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
                   <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
@@ -3040,7 +3076,7 @@ function App() {
             <>
               {/* 热门推荐 / 置顶专区 (#pinned) */}
               {pinnedLinks.length > 0 && (
-                <section id="pinned" className="scroll-mt-6 space-y-4 content-visibility-auto">
+                <section id="pinned" className="scroll-mt-6 space-y-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
                       <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
@@ -3120,7 +3156,7 @@ function App() {
                   <section 
                     key={cat.id} 
                     id={`cat-${cat.id}`} 
-                    className="scroll-mt-6 space-y-4 content-visibility-auto"
+                    className="scroll-mt-6 space-y-4"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center flex-wrap gap-2.5">

@@ -55,6 +55,13 @@
 
 ## 📝 最新更新记录
 
+### 🚀 版本 v2.7.2 (2026.10)
+- **🎯 修复下方分类锚点需多次点击才到位与 URL Hash 自动定位 (Single-Click Anchor & True Height Precision)**：
+  - **彻底移除 `content-visibility: auto` 视口高度估算偏差**：深度排查发现 CSS `content-visibility: auto; contain-intrinsic-size: auto 350px;` 会使视口外分类被浏览器预估为 350px，滚动途中动态计算展开为真实卡片高度（详情版约 1100px / 简约版约 600px），导致目标锚点被向下推挤，因而出现“详情版需点 3 次、简约版需点 2 次才滚动到位”的问题。移除后 DOM 高度自首帧起 100% 真实恒定，点击任意分类均实现**一次点击精准直达**；
+  - **主容器精确像素级滚动 (`container.scrollTo`)**：直接基于主滚动容器相对视口坐标计算目标偏移，预留 24px 呼吸间距，兼具平滑过渡与像素级定位精度；
+  - **URL Hash 链接直达与浏览器前进/后退联动**：直接访问带 `#cat-xxx` 链接或分享带分类的 URL 时，页面就绪后自动平滑滚动定位到目标锚点，并完整监听 `hashchange` 状态；
+  - **滚动监听判定精度提升**：滚动监听器升级为 `getBoundingClientRect` 视口相对距离判定，消除复杂嵌套 DOM 的 `offsetTop` 定位误差。
+
 ### 🚀 版本 v2.7.1 (2026.10)
 - **🛠️ 修复分类滚动与点击锚点视口跳动问题 (Zero-CLS & Smooth Scrollspy)**：
   - **消除动态占位高度突变重排 (CLS = 0)**：彻底移除原 `LazyCategorySection` 在滚动到临界区时从 `180px` 突变为千像素的 React 级动态挂载，杜绝滚动中页面高度频繁膨胀导致的锚点漂移与画面抖动；
