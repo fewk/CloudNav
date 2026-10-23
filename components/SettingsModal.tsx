@@ -166,7 +166,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       cardStyle: siteSettings?.cardStyle || 'detailed',
       passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7,
       openTarget: siteSettings?.openTarget || '_blank',
-      visibleCategoryCount: siteSettings?.visibleCategoryCount ?? 0
+      visibleCategoryCount: siteSettings?.visibleCategoryCount ?? 0,
+      categoryLinkLimit: siteSettings?.categoryLinkLimit ?? (siteSettings?.visibleCategoryCount || 36)
   }));
   
   const [generatedIcons, setGeneratedIcons] = useState<string[]>([]);
@@ -205,7 +206,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           openTarget: siteSettings?.openTarget || '_blank',
           showDescription: siteSettings?.showDescription !== undefined ? siteSettings.showDescription : true,
           showTags: siteSettings?.showTags !== undefined ? siteSettings.showTags : false,
-          visibleCategoryCount: siteSettings?.visibleCategoryCount !== undefined ? siteSettings.visibleCategoryCount : 0
+          visibleCategoryCount: siteSettings?.visibleCategoryCount !== undefined ? siteSettings.visibleCategoryCount : 0,
+          categoryLinkLimit: siteSettings?.categoryLinkLimit !== undefined ? siteSettings.categoryLinkLimit : (siteSettings?.visibleCategoryCount || 36)
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -231,7 +233,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         const next = { ...prev, [key]: value };
         
         // 如果是身份验证过期天数、打开方式、介绍或标签显示修改，立即保存到 KV 空间
-        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags' || key === 'visibleCategoryCount') && authToken) {
+        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags' || key === 'visibleCategoryCount' || key === 'categoryLinkLimit') && authToken) {
             saveWebsiteConfigToKV(next);
         }
         
@@ -1322,11 +1324,60 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 </p>
                             </div>
 
-                            {/* 首页分类显示数量 */}
+                            {/* 每个分类显示链接数（卡片折叠阈值） */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        首页分类显示数量
+                                        每个分类显示链接数
+                                    </label>
+                                    <span className="text-xs text-slate-400">
+                                        当前：每个分类默认展示前 {localSiteSettings.categoryLinkLimit || 36} 个链接
+                                    </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <label className="text-xs text-slate-500 dark:text-slate-400 shrink-0">单分类展示数量：</label>
+                                    <input 
+                                        type="number" 
+                                        min="1"
+                                        max="500"
+                                        value={localSiteSettings.categoryLinkLimit || 36}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value);
+                                            handleSiteChange('categoryLinkLimit', isNaN(val) ? 36 : Math.max(1, Math.min(500, val)));
+                                        }}
+                                        className="w-20 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-center text-sm font-semibold"
+                                    />
+                                    <span className="text-xs text-slate-400">个卡片</span>
+
+                                    {/* 快速预设按钮 */}
+                                    <div className="flex items-center gap-1.5 ml-2 flex-wrap">
+                                        {[12, 18, 24, 36, 48].map(num => (
+                                            <button
+                                                key={num}
+                                                type="button"
+                                                onClick={() => handleSiteChange('categoryLinkLimit', num)}
+                                                className={`px-2.5 py-1 text-xs rounded-lg border transition-all ${
+                                                    (localSiteSettings.categoryLinkLimit || 36) === num
+                                                        ? 'bg-blue-500 text-white border-blue-500 font-bold shadow-xs'
+                                                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                                }`}
+                                            >
+                                                {num}个
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    控制每个分类默认展示的书签数量，超出部分自动收拢并在分类底部显示「展开全部」，点击即可完全展开。建议设为 12、18、24 或 36（契合 2/3/4/6 列栅格响应式排版）。
+                                </p>
+                            </div>
+
+                            {/* 首页主分类展示数量 */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        首页主分类展示数量
                                     </label>
                                     <span className="text-xs text-slate-400">
                                         {(!localSiteSettings.visibleCategoryCount || localSiteSettings.visibleCategoryCount === 0)
@@ -1347,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                         className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                     <label htmlFor="allCategoriesCheckbox" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">
-                                        全部展示（不限制数量）
+                                        全部展示（不限制分类数量）
                                     </label>
                                 </div>
 
@@ -1387,7 +1438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                                             </div>
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            首页默认仅展示前 {localSiteSettings.visibleCategoryCount} 个主分类，未显示的分类自动折叠。可在首页底部点击「展开全部」查看完整内容；侧边栏点击任意已折叠分类也会自动展开。
+                                            首页默认展示前 {localSiteSettings.visibleCategoryCount} 个主分类，未显示的分类自动折叠，可在首页底部点击「展开全部」查看完整内容；侧边栏点击任意已折叠分类也会自动展开。
                                         </p>
                                     </div>
                                 )}

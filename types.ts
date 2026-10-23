@@ -31,6 +31,7 @@ export interface SiteSettings {
   showDescription?: boolean; // 是否显示卡片介绍，默认为 true
   showTags?: boolean; // 是否显示卡片标签，默认为 false
   visibleCategoryCount?: number; // 首页默认展示的主分类数量，0 或未设置表示全部展示
+  categoryLinkLimit?: number; // 每个分类默认展示的网站链接数量，超出折叠并提供展开全部（默认 36）
 }
 
 export interface AppState {

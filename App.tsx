@@ -241,7 +241,8 @@ function App() {
           openTarget: '_blank' as const,
           showDescription: true,
           showTags: false,
-          visibleCategoryCount: 0
+          visibleCategoryCount: 0,
+          categoryLinkLimit: 36
       };
   });
   
@@ -707,7 +708,8 @@ function App() {
                 openTarget: wc.openTarget || prev.openTarget || '_blank',
                 showDescription: wc.showDescription !== undefined ? wc.showDescription : (prev.showDescription !== undefined ? prev.showDescription : true),
                 showTags: wc.showTags !== undefined ? wc.showTags : (prev.showTags !== undefined ? prev.showTags : false),
-                visibleCategoryCount: wc.visibleCategoryCount !== undefined ? wc.visibleCategoryCount : (prev.visibleCategoryCount !== undefined ? prev.visibleCategoryCount : 0)
+                visibleCategoryCount: wc.visibleCategoryCount !== undefined ? wc.visibleCategoryCount : (prev.visibleCategoryCount !== undefined ? prev.visibleCategoryCount : 0),
+                categoryLinkLimit: wc.categoryLinkLimit !== undefined ? wc.categoryLinkLimit : (prev.categoryLinkLimit !== undefined ? prev.categoryLinkLimit : (wc.visibleCategoryCount || 36))
               };
               localStorage.setItem('cloudnav_site_settings', JSON.stringify(updated));
               return updated;
@@ -2267,15 +2269,20 @@ function App() {
     return categories.some(c => c.parentId === selectedCategory);
   }, [selectedCategory, categories]);
 
-  // 分类卡片折叠与展开网格组件（超过 36 个卡片自动折叠收拢）
+  // 分类卡片折叠与展开网格组件（支持自定义每个分类显示链接数量）
   const CollapsibleLinkGrid: React.FC<{
     categoryId: string;
     links: LinkItem[];
     isSorting: boolean;
   }> = ({ categoryId, links, isSorting }) => {
+    // 优先读取用户配置的每个分类显示链接数，若用户之前设置了 visibleCategoryCount 亦可自适应兼容
+    const limit = (siteSettings.categoryLinkLimit && siteSettings.categoryLinkLimit > 0)
+      ? siteSettings.categoryLinkLimit
+      : (siteSettings.visibleCategoryCount && siteSettings.visibleCategoryCount > 0 ? siteSettings.visibleCategoryCount : CATEGORY_COLLAPSE_THRESHOLD);
+
     const isExpanded = expandedCategoryIds.has(categoryId);
-    const shouldCollapse = !isSorting && links.length > CATEGORY_COLLAPSE_THRESHOLD && !isExpanded;
-    const renderLinks = shouldCollapse ? links.slice(0, CATEGORY_COLLAPSE_THRESHOLD) : links;
+    const shouldCollapse = !isSorting && links.length > limit && !isExpanded;
+    const renderLinks = shouldCollapse ? links.slice(0, limit) : links;
 
     return (
       <div className="space-y-3">
@@ -2300,7 +2307,7 @@ function App() {
         </div>
 
         {/* 超量折叠时的“展开全部 / 收起”操作按钮 */}
-        {!isSorting && links.length > CATEGORY_COLLAPSE_THRESHOLD && (
+        {!isSorting && links.length > limit && (
           <div className="pt-2 pb-1 flex justify-center">
             <button
               type="button"
@@ -2316,7 +2323,7 @@ function App() {
                 <>
                   <span>展开全部</span>
                   <span className="text-slate-400 dark:text-slate-500 font-normal">
-                    (已展示 {CATEGORY_COLLAPSE_THRESHOLD} / {links.length})
+                    (已展示 {limit} / {links.length})
                   </span>
                   <ChevronDown size={13} />
                 </>
