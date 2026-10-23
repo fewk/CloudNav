@@ -30,6 +30,7 @@ export interface SiteSettings {
   openTarget?: '_blank' | '_self'; // 链接打开方式：_blank (新页面打开) 或 _self (当前页面打开)
   showDescription?: boolean; // 是否显示卡片介绍，默认为 true
   showTags?: boolean; // 是否显示卡片标签，默认为 false
+  visibleCategoryCount?: number; // 首页默认展示的主分类数量，0 或未设置表示全部展示
 }
 
 export interface AppState {

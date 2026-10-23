@@ -118,6 +118,8 @@ function App() {
 
   // 首页超长分类折叠状态 (阈值 CATEGORY_COLLAPSE_THRESHOLD = 36)
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(() => new Set());
+  // 首页主分类展示数量控制（是否已全部展开）
+  const [isAllCategoriesExpanded, setIsAllCategoriesExpanded] = useState(false);
 
   const toggleCategoryExpanded = useCallback((catId: string) => {
     setExpandedCategoryIds(prev => {
@@ -238,7 +240,8 @@ function App() {
           passwordExpiryDays: 7,
           openTarget: '_blank' as const,
           showDescription: true,
-          showTags: false
+          showTags: false,
+          visibleCategoryCount: 0
       };
   });
   
@@ -703,7 +706,8 @@ function App() {
                 passwordExpiryDays: wc.passwordExpiryDays !== undefined ? wc.passwordExpiryDays : prev.passwordExpiryDays,
                 openTarget: wc.openTarget || prev.openTarget || '_blank',
                 showDescription: wc.showDescription !== undefined ? wc.showDescription : (prev.showDescription !== undefined ? prev.showDescription : true),
-                showTags: wc.showTags !== undefined ? wc.showTags : (prev.showTags !== undefined ? prev.showTags : false)
+                showTags: wc.showTags !== undefined ? wc.showTags : (prev.showTags !== undefined ? prev.showTags : false),
+                visibleCategoryCount: wc.visibleCategoryCount !== undefined ? wc.visibleCategoryCount : (prev.visibleCategoryCount !== undefined ? prev.visibleCategoryCount : 0)
               };
               localStorage.setItem('cloudnav_site_settings', JSON.stringify(updated));
               return updated;
@@ -1534,10 +1538,20 @@ function App() {
     }
   };
 
+  // 根主分类列表
+  const rootCategories = useMemo(() => categories.filter(c => !c.parentId), [categories]);
+  const categoryLimit = siteSettings.visibleCategoryCount && siteSettings.visibleCategoryCount > 0 
+    ? siteSettings.visibleCategoryCount 
+    : 0;
+  const hasCategoryLimit = categoryLimit > 0 && rootCategories.length > categoryLimit;
+  const displayedRootCategories = (hasCategoryLimit && !isAllCategoriesExpanded && !isSortingMode)
+    ? rootCategories.slice(0, categoryLimit)
+    : rootCategories;
+
   // 缓存纵向渲染顺序的所有锚点 ID（包含置顶、父分类及各子分类）
   const sectionIds = useMemo(() => {
     const ids: string[] = ['pinned'];
-    for (const cat of categories.filter(c => !c.parentId)) {
+    for (const cat of displayedRootCategories) {
       ids.push(`cat-${cat.id}`);
       const subCats = categories.filter(c => c.parentId === cat.id);
       for (const sub of subCats) {
@@ -1545,7 +1559,7 @@ function App() {
       }
     }
     return ids;
-  }, [categories]);
+  }, [displayedRootCategories, categories]);
 
   const rafIdRef = useRef<number | null>(null);
 
@@ -1581,6 +1595,17 @@ function App() {
     isManualScrollingRef.current = true;
     setActiveSection(targetId);
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+    // 如果目标分类处于未展示折叠区，自动展开全部分类并预留渲染时间
+    let needsExpandWait = false;
+    if (hasCategoryLimit && !isAllCategoriesExpanded) {
+      const pureCatId = targetId.startsWith('cat-') ? targetId.replace('cat-', '') : targetId;
+      const targetCatIndex = rootCategories.findIndex(c => c.id === pureCatId || categories.some(sub => sub.parentId === c.id && sub.id === pureCatId));
+      if (targetCatIndex >= categoryLimit) {
+        setIsAllCategoriesExpanded(true);
+        needsExpandWait = true;
+      }
+    }
 
     const doScroll = () => {
       const container = contentScrollRef.current;
@@ -1626,8 +1651,8 @@ function App() {
       checkAndScroll();
     };
 
-    if (searchQuery.trim()) {
-      setSearchQuery('');
+    if (searchQuery.trim() || needsExpandWait) {
+      if (searchQuery.trim()) setSearchQuery('');
       setTimeout(doScroll, 50);
     } else {
       doScroll();
@@ -3178,8 +3203,8 @@ function App() {
                 </section>
               )}
 
-              {/* 全景分类流：所有分类依次纵向排列展示 */}
-              {categories.filter(c => !c.parentId).map(cat => {
+              {/* 全景分类流：根据显示数量控制渲染分类 */}
+              {displayedRootCategories.map(cat => {
                 const subCats = categories.filter(c => c.parentId === cat.id);
                 const isLocked = isCategoryLocked(cat.id);
                 const catLinks = parentCategoryLinksMap.get(cat.id) || [];
@@ -3372,6 +3397,43 @@ function App() {
                   </section>
                 );
               })}
+
+              {/* 首页主分类显示数量限制：展开全部 / 收起 控制按钮 */}
+              {hasCategoryLimit && !isSortingMode && (
+                <div className="pt-6 pb-12 flex flex-col items-center justify-center gap-2">
+                  {!isAllCategoriesExpanded ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsAllCategoriesExpanded(true)}
+                      className="group px-6 py-3 text-sm font-semibold rounded-full bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer select-none"
+                    >
+                      <ChevronDown size={17} className="group-hover:translate-y-0.5 transition-transform" />
+                      <span>展开全部分类</span>
+                      <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
+                        (已展示 {categoryLimit} / {rootCategories.length} 个分类，还有 {rootCategories.length - categoryLimit} 个未展示)
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAllCategoriesExpanded(false);
+                        const limitCat = rootCategories[categoryLimit - 1];
+                        if (limitCat) {
+                          scrollToSection(`cat-${limitCat.id}`);
+                        }
+                      }}
+                      className="px-5 py-2 text-xs font-medium rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer select-none"
+                    >
+                      <ChevronUp size={14} />
+                      <span>收起分类 (仅展示前 {categoryLimit} 个主分类)</span>
+                    </button>
+                  )}
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    可在「系统设置」中自定义首页默认展示的主分类数量
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

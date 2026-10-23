@@ -165,7 +165,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       favicon: siteSettings?.favicon || '',
       cardStyle: siteSettings?.cardStyle || 'detailed',
       passwordExpiryDays: siteSettings?.passwordExpiryDays ?? 7,
-      openTarget: siteSettings?.openTarget || '_blank'
+      openTarget: siteSettings?.openTarget || '_blank',
+      visibleCategoryCount: siteSettings?.visibleCategoryCount ?? 0
   }));
   
   const [generatedIcons, setGeneratedIcons] = useState<string[]>([]);
@@ -203,7 +204,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           passwordExpiryDays: siteSettings?.passwordExpiryDays !== undefined ? siteSettings.passwordExpiryDays : 7,
           openTarget: siteSettings?.openTarget || '_blank',
           showDescription: siteSettings?.showDescription !== undefined ? siteSettings.showDescription : true,
-          showTags: siteSettings?.showTags !== undefined ? siteSettings.showTags : false
+          showTags: siteSettings?.showTags !== undefined ? siteSettings.showTags : false,
+          visibleCategoryCount: siteSettings?.visibleCategoryCount !== undefined ? siteSettings.visibleCategoryCount : 0
       };
       setLocalSiteSettings(safeSettings);
       if (generatedIcons.length === 0) {
@@ -229,7 +231,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         const next = { ...prev, [key]: value };
         
         // 如果是身份验证过期天数、打开方式、介绍或标签显示修改，立即保存到 KV 空间
-        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags') && authToken) {
+        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags' || key === 'visibleCategoryCount') && authToken) {
             saveWebsiteConfigToKV(next);
         }
         
@@ -1318,6 +1320,77 @@ document.addEventListener('DOMContentLoaded', async () => {
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
                                     控制书签卡片上是否显示文字介绍与分类标签（默认关闭标签展示以保持页面极简清爽）
                                 </p>
+                            </div>
+
+                            {/* 首页分类显示数量 */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        首页分类显示数量
+                                    </label>
+                                    <span className="text-xs text-slate-400">
+                                        {(!localSiteSettings.visibleCategoryCount || localSiteSettings.visibleCategoryCount === 0)
+                                            ? '当前：全部展示'
+                                            : `当前：默认展示前 ${localSiteSettings.visibleCategoryCount} 个`}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        id="allCategoriesCheckbox"
+                                        checked={!localSiteSettings.visibleCategoryCount || localSiteSettings.visibleCategoryCount === 0}
+                                        onChange={(e) => {
+                                            const isAll = e.target.checked;
+                                            handleSiteChange('visibleCategoryCount', isAll ? 0 : 6);
+                                        }}
+                                        className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="allCategoriesCheckbox" className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                        全部展示（不限制数量）
+                                    </label>
+                                </div>
+
+                                {localSiteSettings.visibleCategoryCount !== undefined && localSiteSettings.visibleCategoryCount > 0 && (
+                                    <div className="pt-1.5 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-xs text-slate-500 dark:text-slate-400 shrink-0">默认展示主分类数：</label>
+                                            <input 
+                                                type="number" 
+                                                min="1"
+                                                max="100"
+                                                value={localSiteSettings.visibleCategoryCount || 6}
+                                                onChange={(e) => {
+                                                    const val = parseInt(e.target.value);
+                                                    handleSiteChange('visibleCategoryCount', isNaN(val) ? 6 : Math.max(1, Math.min(100, val)));
+                                                }}
+                                                className="w-20 p-2 rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-center text-sm font-semibold"
+                                            />
+                                            <span className="text-xs text-slate-400">个分类</span>
+
+                                            {/* 快速预设按钮 */}
+                                            <div className="flex items-center gap-1.5 ml-2">
+                                                {[4, 6, 8, 10].map(num => (
+                                                    <button
+                                                        key={num}
+                                                        type="button"
+                                                        onClick={() => handleSiteChange('visibleCategoryCount', num)}
+                                                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all ${
+                                                            localSiteSettings.visibleCategoryCount === num
+                                                                ? 'bg-blue-500 text-white border-blue-500 font-bold shadow-xs'
+                                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                                        }`}
+                                                    >
+                                                        {num}个
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            首页默认仅展示前 {localSiteSettings.visibleCategoryCount} 个主分类，未显示的分类自动折叠。可在首页底部点击「展开全部」查看完整内容；侧边栏点击任意已折叠分类也会自动展开。
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">
