@@ -19,6 +19,7 @@ export interface Category {
   icon: string; // Lucide icon name or emoji
   password?: string; // Optional password for category protection
   parentId?: string; // ID of the parent category if this is a sub-category
+  order?: number; // 排序序号，数字越小越靠前
 }
 
 export interface SiteSettings {
@@ -83,13 +84,13 @@ export interface SearchConfig {
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'common', name: '常用推荐', icon: 'Star' },
-  { id: 'sub-search', name: '搜索引擎', icon: 'Search', parentId: 'common' },
-  { id: 'sub-news', name: '即时资讯', icon: 'Newspaper', parentId: 'common' },
-  { id: 'dev', name: '开发工具', icon: 'Code' },
-  { id: 'design', name: '设计资源', icon: 'Palette' },
-  { id: 'ent', name: '休闲娱乐', icon: 'Gamepad2' },
-  { id: 'ai', name: '人工智能', icon: 'Bot' },
+  { id: 'common', name: '常用推荐', icon: 'Star', order: 1 },
+  { id: 'sub-search', name: '搜索引擎', icon: 'Search', parentId: 'common', order: 1 },
+  { id: 'sub-news', name: '即时资讯', icon: 'Newspaper', parentId: 'common', order: 2 },
+  { id: 'dev', name: '开发工具', icon: 'Code', order: 2 },
+  { id: 'design', name: '设计资源', icon: 'Palette', order: 3 },
+  { id: 'ent', name: '休闲娱乐', icon: 'Gamepad2', order: 4 },
+  { id: 'ai', name: '人工智能', icon: 'Bot', order: 5 },
 ];
 
 export const INITIAL_LINKS: LinkItem[] = [

@@ -26,6 +26,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, SiteSettings } from './types';
+import { normalizeCategories } from './services/categoryUtils';
 import Icon from './components/Icon';
 import ContextMenu from './components/ContextMenu';
 import LinkCard from './components/LinkCard';
@@ -71,6 +72,7 @@ function getInitialNavData(): { links: LinkItem[]; categories: Category[] } {
       if (!loadedCategories.some((c: Category) => c.id === 'common')) {
         loadedCategories = [{ id: 'common', name: '常用推荐', icon: 'Star' }, ...loadedCategories];
       }
+      loadedCategories = normalizeCategories(loadedCategories);
       const validCategoryIds = new Set(loadedCategories.map((c: Category) => c.id));
       let loadedLinks = (parsed.links || INITIAL_LINKS).map((link: LinkItem) => {
         if (!validCategoryIds.has(link.categoryId)) {
@@ -357,7 +359,7 @@ function App() {
         });
         
         setLinks(loadedLinks);
-        setCategories(loadedCategories);
+        setCategories(normalizeCategories(loadedCategories));
       } catch (e) {
         setLinks(INITIAL_LINKS);
         setCategories(DEFAULT_CATEGORIES);
@@ -412,16 +414,17 @@ function App() {
   };
 
   const updateData = (newLinks: LinkItem[], newCategories: Category[]) => {
+      const cleanCategories = normalizeCategories(newCategories);
       // 1. Optimistic UI Update
       setLinks(newLinks);
-      setCategories(newCategories);
+      setCategories(cleanCategories);
       
       // 2. Save to Local Cache
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links: newLinks, categories: newCategories }));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ links: newLinks, categories: cleanCategories }));
 
       // 3. Sync to Cloud (if authenticated)
       if (authToken) {
-          syncToCloud(newLinks, newCategories, authToken);
+          syncToCloud(newLinks, cleanCategories, authToken);
       }
   };
 
@@ -680,7 +683,7 @@ function App() {
 
           if (payload.data && payload.data.links && payload.data.links.length > 0) {
             setLinks(payload.data.links);
-            setCategories(payload.data.categories || DEFAULT_CATEGORIES);
+            setCategories(normalizeCategories(payload.data.categories || DEFAULT_CATEGORIES));
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload.data));
             loadLinkIcons(payload.data.links);
           }
@@ -932,7 +935,7 @@ function App() {
                     // 如果服务器有数据，使用服务器数据
                     if (data.links && data.links.length > 0) {
                         setLinks(data.links);
-                        setCategories(data.categories || DEFAULT_CATEGORIES);
+                        setCategories(normalizeCategories(data.categories || DEFAULT_CATEGORIES));
                         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
                         
                         // 加载链接图标缓存
@@ -1541,7 +1544,10 @@ function App() {
   };
 
   // 根主分类列表
-  const rootCategories = useMemo(() => categories.filter(c => !c.parentId), [categories]);
+  const rootCategories = useMemo(() => {
+    const roots = categories.filter(c => !c.parentId);
+    return [...roots].sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+  }, [categories]);
   const categoryLimit = siteSettings.visibleCategoryCount && siteSettings.visibleCategoryCount > 0 
     ? siteSettings.visibleCategoryCount 
     : 0;
@@ -2573,7 +2579,7 @@ function App() {
               </button>
             </div>
 
-            {categories.filter(c => !c.parentId).map(cat => {
+            {rootCategories.map(cat => {
                 const isLocked = cat.password && !unlockedCategoryIds.has(cat.id);
                 const subCats = categories.filter(c => c.parentId === cat.id);
                 const isActive = (activeSection === `cat-${cat.id}` || subCats.some(sc => activeSection === `cat-${sc.id}`)) && !searchQuery;

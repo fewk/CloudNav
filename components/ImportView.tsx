@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileText, Check, AlertCircle, FolderInput, ListTree, Database, Tag, Sparkles } from 'lucide-react';
 import { Category, LinkItem, SearchConfig, AIConfig } from '../types';
 import { parseBookmarks } from '../services/bookmarkParser';
+import { normalizeCategories } from '../services/categoryUtils';
 
 export interface ImportViewProps {
   existingLinks: LinkItem[];
@@ -243,7 +244,7 @@ const ImportView: React.FC<ImportViewProps> = ({
         };
       });
 
-      finalCategories = categoriesToAdd;
+      finalCategories = normalizeCategories(categoriesToAdd);
     }
 
     onImport(finalLinks, finalCategories);

@@ -4,6 +4,12 @@ import { Category } from '../types';
 import Icon from './Icon';
 import IconSelector from './IconSelector';
 import CategoryDeleteModal from './CategoryDeleteModal';
+import {
+  normalizeCategories,
+  moveCategory,
+  setCategoryOrder,
+  canMoveCategory
+} from '../services/categoryUtils';
 
 interface CategoryManagerViewProps {
   categories: Category[];
@@ -22,11 +28,13 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
   const [editPassword, setEditPassword] = useState('');
   const [editIcon, setEditIcon] = useState('Folder');
   const [editParentId, setEditParentId] = useState<string | undefined>(undefined);
+  const [editOrder, setEditOrder] = useState<string>('1');
 
   const [newCatName, setNewCatName] = useState('');
   const [newCatPassword, setNewCatPassword] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('Folder');
   const [newCatParentId, setNewCatParentId] = useState<string | undefined>(undefined);
+  const [newCatOrder, setNewCatOrder] = useState<string>('');
 
   const [isIconSelectorOpen, setIsIconSelectorOpen] = useState(false);
   const [iconSelectorTarget, setIconSelectorTarget] = useState<'edit' | 'new' | null>(null);
@@ -34,6 +42,16 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
   // 删除确认弹窗状态
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+
+  // 挂载时检测并自动纠正可能存在的异常/重复数据
+  useEffect(() => {
+    const normalized = normalizeCategories(categories);
+    const hasDuplicates = normalized.length !== categories.length;
+    const hasOrderMismatch = categories.some((c, i) => !c.order || c.order !== normalized[i]?.order || c.id !== normalized[i]?.id);
+    if (hasDuplicates || hasOrderMismatch) {
+      onUpdateCategories(normalized);
+    }
+  }, []);
 
   // ESC 键监听子弹窗
   useEffect(() => {
@@ -54,78 +72,22 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isIconSelectorOpen, isDeleteModalOpen, editingId]);
 
-  const handleMove = (index: number, direction: 'up' | 'down') => {
-    const cat = categories[index];
-    const newCats = [...categories];
-
-    if (cat.parentId) {
-      // 二级分类：只能在其父分类下的二级分类中移动
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (targetIndex >= 0 && targetIndex < newCats.length && newCats[targetIndex].parentId === cat.parentId) {
-        [newCats[index], newCats[targetIndex]] = [newCats[targetIndex], newCats[index]];
-      }
-    } else {
-      // 一级分类：带着其下的二级分类一起整体移动
-      const getBlock = (list: Category[], idx: number) => {
-        const p = list[idx];
-        const block = [p];
-        let i = idx + 1;
-        while (i < list.length && list[i].parentId === p.id) {
-          block.push(list[i]);
-          i++;
-        }
-        return block;
-      };
-
-      const currentBlock = getBlock(categories, index);
-      if (direction === 'up') {
-        let prevParentIdx = -1;
-        for (let i = index - 1; i >= 0; i--) {
-          if (!categories[i].parentId) {
-            prevParentIdx = i;
-            break;
-          }
-        }
-        if (prevParentIdx !== -1) {
-          const prevBlock = getBlock(categories, prevParentIdx);
-          newCats.splice(prevParentIdx, prevBlock.length + currentBlock.length, ...currentBlock, ...prevBlock);
-        }
-      } else {
-        let nextParentIdx = -1;
-        for (let i = index + currentBlock.length; i < categories.length; i++) {
-          if (!categories[i].parentId) {
-            nextParentIdx = i;
-            break;
-          }
-        }
-        if (nextParentIdx !== -1) {
-          const nextBlock = getBlock(categories, nextParentIdx);
-          newCats.splice(index, currentBlock.length + nextBlock.length, ...nextBlock, ...currentBlock);
-        }
-      }
-    }
+  const handleMove = (catId: string, direction: 'up' | 'down') => {
+    const newCats = moveCategory(categories, catId, direction);
     onUpdateCategories(newCats);
   };
 
-  const canMoveUp = (index: number) => {
-    const cat = categories[index];
-    if (index === 0) return false;
-    if (cat.parentId) {
-      return categories[index - 1]?.parentId === cat.parentId;
-    }
-    return categories.slice(0, index).some(c => !c.parentId);
+  const handleQuickOrderChange = (catId: string, val: string) => {
+    const parsed = parseInt(val, 10);
+    if (isNaN(parsed) || parsed < 1) return;
+    const currentCat = categories.find(c => c.id === catId);
+    if (currentCat && currentCat.order === parsed) return;
+    const newCats = setCategoryOrder(categories, catId, parsed);
+    onUpdateCategories(newCats);
   };
 
-  const canMoveDown = (index: number) => {
-    const cat = categories[index];
-    if (index === categories.length - 1) return false;
-    if (cat.parentId) {
-      return categories[index + 1]?.parentId === cat.parentId;
-    }
-    const currentBlockSize = categories.slice(index + 1).findIndex(c => !c.parentId);
-    if (currentBlockSize === -1) return false;
-    return true;
-  };
+  const canMoveUp = (catId: string) => canMoveCategory(categories, catId, 'up');
+  const canMoveDown = (catId: string) => canMoveCategory(categories, catId, 'down');
 
   const startEdit = (cat: Category) => {
     setEditingId(cat.id);
@@ -133,6 +95,7 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
     setEditPassword(cat.password || '');
     setEditIcon(cat.icon || 'Folder');
     setEditParentId(cat.parentId);
+    setEditOrder(String(cat.order || 1));
   };
 
   const cancelEdit = () => {
@@ -142,73 +105,59 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
   const saveEdit = () => {
     if (!editingId || !editName.trim()) return;
 
-    const oldCat = categories.find(c => c.id === editingId);
-    const parentChanged = oldCat?.parentId !== editParentId;
+    const parsedOrder = parseInt(editOrder, 10);
+    const targetOrder = isNaN(parsedOrder) || parsedOrder < 1 ? 1 : parsedOrder;
 
-    let updatedCats = categories.map(c => c.id === editingId ? {
+    // 先应用名称、图标、密码、父分类属性
+    const updatedCats = categories.map(c => c.id === editingId ? {
       ...c,
       name: editName.trim(),
       icon: editIcon,
       password: editPassword.trim() || undefined,
-      parentId: editParentId
+      parentId: editParentId,
+      order: targetOrder
     } : c);
 
-    if (parentChanged) {
-      const catToMove = updatedCats.find(c => c.id === editingId)!;
-      let filtered = updatedCats.filter(c => c.id !== editingId);
-
-      if (editParentId) {
-        const parentIdx = filtered.findIndex(c => c.id === editParentId);
-        if (parentIdx !== -1) {
-          let insertIdx = parentIdx + 1;
-          while (insertIdx < filtered.length && filtered[insertIdx].parentId === editParentId) {
-            insertIdx++;
-          }
-          filtered.splice(insertIdx, 0, catToMove);
-          updatedCats = filtered;
-        }
-      } else {
-        filtered.push(catToMove);
-        updatedCats = filtered;
-      }
-    }
-
-    onUpdateCategories(updatedCats);
+    // 通过规范的 setCategoryOrder 精准安置到指定序号并自动重排兄弟项
+    const finalCats = setCategoryOrder(updatedCats, editingId, targetOrder);
+    onUpdateCategories(finalCats);
     setEditingId(null);
   };
 
   const handleAdd = () => {
     if (!newCatName.trim()) return;
+
+    // 计算默认排序序号（末尾）
+    let defaultOrder = 1;
+    if (newCatParentId) {
+      const siblings = categories.filter(c => c.parentId === newCatParentId);
+      defaultOrder = siblings.length + 1;
+    } else {
+      const roots = categories.filter(c => !c.parentId);
+      defaultOrder = roots.length + 1;
+    }
+
+    const parsedOrder = parseInt(newCatOrder, 10);
+    const targetOrder = !isNaN(parsedOrder) && parsedOrder >= 1 ? parsedOrder : defaultOrder;
+
     const newCat: Category = {
       id: Date.now().toString(),
       name: newCatName.trim(),
       icon: newCatIcon,
       password: newCatPassword.trim() || undefined,
-      parentId: newCatParentId
+      parentId: newCatParentId,
+      order: targetOrder
     };
 
-    let newCats: Category[];
-    if (newCatParentId) {
-      const parentIdx = categories.findIndex(c => c.id === newCatParentId);
-      if (parentIdx !== -1) {
-        let insertIdx = parentIdx + 1;
-        while (insertIdx < categories.length && categories[insertIdx].parentId === newCatParentId) {
-          insertIdx++;
-        }
-        newCats = [...categories];
-        newCats.splice(insertIdx, 0, newCat);
-      } else {
-        newCats = [...categories, newCat];
-      }
-    } else {
-      newCats = [...categories, newCat];
-    }
+    const updatedCats = [...categories, newCat];
+    const finalCats = setCategoryOrder(updatedCats, newCat.id, targetOrder);
+    onUpdateCategories(finalCats);
 
-    onUpdateCategories(newCats);
     setNewCatName('');
     setNewCatPassword('');
     setNewCatIcon('Folder');
     setNewCatParentId(undefined);
+    setNewCatOrder('');
   };
 
   const handleDeleteClick = (cat: Category) => {
@@ -247,8 +196,8 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
           <Plus size={16} className="text-blue-500" /> 添加新分类
         </h4>
         <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-6">
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">分类名称</label>
               <div className="flex items-center gap-2">
                 <button
@@ -270,7 +219,7 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
               </div>
             </div>
 
-            <div>
+            <div className="md:col-span-4">
               <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">所属层级</label>
               <select
                 value={newCatParentId || ''}
@@ -282,6 +231,19 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
                   <option key={c.id} value={c.id}>↳ 归属于：{c.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">排序序号</label>
+              <input
+                type="number"
+                min="1"
+                value={newCatOrder}
+                onChange={(e) => setNewCatOrder(e.target.value)}
+                placeholder="留空自动排末尾"
+                className="w-full p-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                title="排序序号（数字越小越靠前，留空自动排在末尾）"
+              />
             </div>
           </div>
 
@@ -315,7 +277,7 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
             <FolderTree size={16} className="text-blue-500" /> 分类目录 ({categories.length})
           </h4>
           <span className="text-xs text-slate-400 dark:text-slate-500">
-            可通过上下箭头调整前后排序
+            支持设置序号排序，也可通过上下箭头调整次序
           </span>
         </div>
 
@@ -375,6 +337,19 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
                             ))
                           }
                         </select>
+
+                        <div className="flex items-center gap-1.5 shrink-0 bg-blue-50/60 dark:bg-slate-700/60 px-2 py-1 rounded-lg border border-blue-200 dark:border-blue-900/50">
+                          <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">序号:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editOrder}
+                            onChange={(e) => setEditOrder(e.target.value)}
+                            placeholder="序号"
+                            className="w-14 p-1 text-xs text-center font-semibold rounded border border-blue-400 dark:border-blue-600 dark:bg-slate-700 dark:text-white outline-none"
+                            title="设置排序序号（数字越小越靠前）"
+                          />
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between gap-2 pt-1">
@@ -408,24 +383,47 @@ const CategoryManagerView: React.FC<CategoryManagerViewProps> = ({
                   ) : (
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        {/* 排序按钮 */}
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button
-                            onClick={() => handleMove(index, 'up')}
-                            disabled={!canMoveUp(index)}
-                            className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
-                            title="上移"
+                        {/* 排序与序号控制 */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              onClick={() => handleMove(cat.id, 'up')}
+                              disabled={!canMoveUp(cat.id)}
+                              className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+                              title="上移"
+                            >
+                              <ArrowUp size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleMove(cat.id, 'down')}
+                              disabled={!canMoveDown(cat.id)}
+                              className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+                              title="下移"
+                            >
+                              <ArrowDown size={14} />
+                            </button>
+                          </div>
+
+                          {/* 序号快捷修改 */}
+                          <div 
+                            className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/80 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-600/80 shadow-2xs"
+                            title="当前排序序号（可直接输入修改，回车或失焦生效，数字越小越靠前）"
                           >
-                            <ArrowUp size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleMove(index, 'down')}
-                            disabled={!canMoveDown(index)}
-                            className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-20 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
-                            title="下移"
-                          >
-                            <ArrowDown size={14} />
-                          </button>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-400 font-mono select-none">#</span>
+                            <input
+                              type="number"
+                              min="1"
+                              defaultValue={cat.order ?? index + 1}
+                              key={`${cat.id}-${cat.order}`}
+                              onBlur={(e) => handleQuickOrderChange(cat.id, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              className="w-7 text-center text-xs font-semibold text-slate-700 dark:text-slate-200 bg-transparent outline-none focus:text-blue-600 dark:focus:text-blue-400 p-0"
+                            />
+                          </div>
                         </div>
 
                         {/* 图标与名称 */}
