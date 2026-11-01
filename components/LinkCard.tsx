@@ -46,17 +46,17 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   const gradient = getAppGradient(link.title);
   const initialChar = getInitialChar(link.title);
 
-  // 渲染应用大图标（无白色边框与厚内衬，尺寸饱满大方）
+  // 渲染应用大图标（保留白底 Squircle 容器，内部图标饱满清晰）
   const renderAppIcon = () => {
     if (link.icon) {
       return (
-        <div className="w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center relative">
+        <div className="w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] bg-white dark:bg-slate-800 border border-black/[0.06] dark:border-white/[0.1] shadow-sm flex items-center justify-center p-2 relative overflow-hidden transition-all duration-200">
           <img
             src={link.icon}
             alt=""
             loading="lazy"
             decoding="async"
-            className="w-full h-full max-w-[54px] max-h-[54px] sm:max-w-[58px] sm:max-h-[58px] object-contain rounded-[14px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_2px_12px_rgba(0,0,0,0.45)] transition-transform duration-200 group-hover:scale-105"
+            className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
             onError={(e) => {
               const target = e.target as HTMLElement;
               target.style.display = 'none';
@@ -65,14 +65,14 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
             }}
           />
           {/* 加载失败时的首字母回退 */}
-          <div className={`fallback-icon hidden w-full h-full rounded-[18px] overflow-hidden items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold`}>
+          <div className={`fallback-icon hidden absolute inset-0 w-full h-full rounded-[18px] items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold`}>
             <span className="select-none tracking-wider">{initialChar}</span>
           </div>
         </div>
       );
     }
     return (
-      <div className={`w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] overflow-hidden flex items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold transition-transform duration-200 group-hover:scale-105`}>
+      <div className={`w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] overflow-hidden flex items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold transition-all duration-200`}>
         <span className="select-none tracking-wider">{initialChar}</span>
       </div>
     );
@@ -82,15 +82,15 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   const renderCompactIcon = (isDetailMode: boolean) => {
     if (link.icon) {
       return (
-        <div className={`flex items-center justify-center shrink-0 overflow-hidden relative ${
-          isDetailMode ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg'
+        <div className={`flex items-center justify-center shrink-0 overflow-hidden relative bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 ${
+          isDetailMode ? 'w-10 h-10 rounded-xl p-1.5' : 'w-8 h-8 rounded-lg p-1'
         }`}>
           <img
             src={link.icon}
             alt=""
             loading="lazy"
             decoding="async"
-            className="w-full h-full object-contain rounded-md"
+            className="w-full h-full object-contain"
             onError={(e) => {
               const target = e.target as HTMLElement;
               target.style.display = 'none';
@@ -98,7 +98,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
               if (fallback) fallback.style.display = 'flex';
             }}
           />
-          <div className={`fallback-compact hidden w-full h-full items-center justify-center font-bold ${
+          <div className={`fallback-compact hidden absolute inset-0 w-full h-full items-center justify-center font-bold ${
             isDetailMode ? 'text-base rounded-xl' : 'text-xs rounded-lg'
           } ${gradient.gradientClass} ${gradient.textClass}`}>
             {initialChar}
@@ -166,7 +166,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
             title={link.description ? `${link.title} - ${link.description}` : link.title}
           >
             {/* 图标与角标外壳 */}
-            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-all duration-200 group-hover:-translate-y-1.5 group-hover:scale-105 active:scale-95">
+            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-all duration-200 group-hover:-translate-y-1.5 group-hover:scale-105 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.3)] group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] rounded-[18px]">
               {renderAppIcon()}
 
               {/* Emoji 标记角标 */}
