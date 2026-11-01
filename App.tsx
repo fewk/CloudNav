@@ -2222,23 +2222,23 @@ function App() {
           {...listeners}
         >
           {/* 图标与角标外壳 */}
-          <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-transform duration-200 group-hover:scale-105">
-            <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] ${
-              link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass} text-xl font-bold shadow-inner`
-            }`}>
-              {link.icon ? (
+          <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+            {link.icon ? (
+              <div className="w-full h-full flex items-center justify-center">
                 <img
                   src={link.icon}
                   alt=""
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-contain p-1"
+                  className="w-full h-full max-w-[54px] max-h-[54px] sm:max-w-[58px] sm:max-h-[58px] object-contain rounded-[14px] drop-shadow-sm transition-transform duration-200"
                   onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
                 />
-              ) : (
+              </div>
+            ) : (
+              <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold shadow-md`}>
                 <span className="select-none tracking-wider">{initialChar}</span>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Emoji 标记角标 */}
             {link.emoji && (
@@ -2299,11 +2299,11 @@ function App() {
         }`}>
           {/* 第一行：图标和标题 */}
           <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3 pr-7' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
-              isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
+            <div className={`flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden ${
+              isDetailedView ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg text-xs'
+            } ${link.icon ? '' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
               {link.icon ? (
-                <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+                <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain rounded-md" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               ) : (
                 <span className="select-none">{initialChar}</span>
               )}

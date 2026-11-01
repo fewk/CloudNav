@@ -31,7 +31,6 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   isBatchEditMode = false,
   onToggleSelection,
   onContextMenu,
-  onEdit,
   onTagClick,
 }) => {
   // 计算有效的卡片展示形态
@@ -47,27 +46,72 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   const gradient = getAppGradient(link.title);
   const initialChar = getInitialChar(link.title);
 
-  // 渲染图标内部内容（Favicon 或 iOS 灵动渐变首字母）
-  const renderIconContent = (sizeClass: string) => {
+  // 渲染应用大图标（无白色边框与厚内衬，尺寸饱满大方）
+  const renderAppIcon = () => {
     if (link.icon) {
       return (
-        <img
-          src={link.icon}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className={`w-full h-full object-contain ${sizeClass}`}
-          onError={(e) => {
-            const target = e.target as HTMLElement;
-            target.style.display = 'none';
-          }}
-        />
+        <div className="w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center relative">
+          <img
+            src={link.icon}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full max-w-[54px] max-h-[54px] sm:max-w-[58px] sm:max-h-[58px] object-contain rounded-[14px] drop-shadow-[0_2px_8px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_2px_12px_rgba(0,0,0,0.45)] transition-transform duration-200 group-hover:scale-105"
+            onError={(e) => {
+              const target = e.target as HTMLElement;
+              target.style.display = 'none';
+              const fallback = target.parentElement?.querySelector('.fallback-icon') as HTMLElement;
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+          {/* 加载失败时的首字母回退 */}
+          <div className={`fallback-icon hidden w-full h-full rounded-[18px] overflow-hidden items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold`}>
+            <span className="select-none tracking-wider">{initialChar}</span>
+          </div>
+        </div>
       );
     }
     return (
-      <span className="select-none font-bold tracking-wider">
-        {initialChar}
-      </span>
+      <div className={`w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] overflow-hidden flex items-center justify-center shadow-md ${gradient.gradientClass} ${gradient.textClass} text-2xl font-bold transition-transform duration-200 group-hover:scale-105`}>
+        <span className="select-none tracking-wider">{initialChar}</span>
+      </div>
+    );
+  };
+
+  // 渲染紧凑横向模式图标（简约与详情模式）
+  const renderCompactIcon = (isDetailMode: boolean) => {
+    if (link.icon) {
+      return (
+        <div className={`flex items-center justify-center shrink-0 overflow-hidden relative ${
+          isDetailMode ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg'
+        }`}>
+          <img
+            src={link.icon}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-contain rounded-md"
+            onError={(e) => {
+              const target = e.target as HTMLElement;
+              target.style.display = 'none';
+              const fallback = target.parentElement?.querySelector('.fallback-compact') as HTMLElement;
+              if (fallback) fallback.style.display = 'flex';
+            }}
+          />
+          <div className={`fallback-compact hidden w-full h-full items-center justify-center font-bold ${
+            isDetailMode ? 'text-base rounded-xl' : 'text-xs rounded-lg'
+          } ${gradient.gradientClass} ${gradient.textClass}`}>
+            {initialChar}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className={`flex items-center justify-center shrink-0 overflow-hidden font-bold ${
+        isDetailMode ? 'w-10 h-10 rounded-xl text-base' : 'w-8 h-8 rounded-lg text-xs'
+      } ${gradient.gradientClass} ${gradient.textClass}`}>
+        <span className="select-none">{initialChar}</span>
+      </div>
     );
   };
 
@@ -88,12 +132,8 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
         {isBatchEditMode ? (
           <div className="flex flex-col items-center w-full">
             {/* 图标与角标外壳 */}
-            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-transform duration-200 group-hover:scale-105">
-              <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] shadow-sm ${
-                link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass}`
-              }`}>
-                {renderIconContent('p-1')}
-              </div>
+            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+              {renderAppIcon()}
 
               {/* 批量编辑选中勾选框 */}
               <div className={`absolute -top-1.5 -right-1.5 z-20 w-5 h-5 rounded-full flex items-center justify-center shadow-md transition-colors ${
@@ -126,12 +166,8 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
             title={link.description ? `${link.title} - ${link.description}` : link.title}
           >
             {/* 图标与角标外壳 */}
-            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-all duration-200 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
-              <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] ${
-                link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass} text-xl shadow-inner`
-              }`}>
-                {renderIconContent('p-1')}
-              </div>
+            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-all duration-200 group-hover:-translate-y-1.5 group-hover:scale-105 active:scale-95">
+              {renderAppIcon()}
 
               {/* Emoji 标记角标 */}
               {link.emoji && (
@@ -186,11 +222,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
         }`}>
           {/* 第一行：图标与标题 */}
           <div className={`flex items-center gap-2.5 ${isDetail ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
-              isDetail ? 'w-10 h-10 rounded-xl' : 'w-7 h-7 rounded-lg text-xs'
-            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60 p-1.5' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
-              {renderIconContent('p-0.5')}
-            </div>
+            {renderCompactIcon(isDetail)}
 
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <h3 className={`font-semibold text-slate-800 dark:text-slate-100 truncate ${
@@ -239,11 +271,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
         >
           {/* 第一行：图标与标题 */}
           <div className={`flex items-center gap-2.5 ${isDetail ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
-              isDetail ? 'w-10 h-10 rounded-xl' : 'w-7 h-7 rounded-lg text-xs'
-            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60 p-1.5' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
-              {renderIconContent('p-0.5')}
-            </div>
+            {renderCompactIcon(isDetail)}
 
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
               <h3 className={`font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
