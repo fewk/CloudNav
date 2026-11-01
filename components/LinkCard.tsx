@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Star, Check, Settings2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { LinkItem, CardStyle } from '../types';
 import { getAppGradient, getInitialChar } from '../services/colorUtils';
 
@@ -133,16 +133,6 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
                 {renderIconContent('p-1')}
               </div>
 
-              {/* 置顶星标角标 */}
-              {link.pinned && (
-                <div
-                  className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 rounded-full bg-amber-400 text-amber-950 shadow-sm border border-amber-300 flex items-center justify-center"
-                  title="常用置顶推荐"
-                >
-                  <Star size={11} fill="currentColor" />
-                </div>
-              )}
-
               {/* Emoji 标记角标 */}
               {link.emoji && (
                 <div
@@ -161,23 +151,6 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
               </span>
             </div>
           </a>
-        )}
-
-        {/* 悬浮快捷编辑按钮 */}
-        {!isBatchEditMode && onEdit && (
-          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit(link);
-              }}
-              className="p-1 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-400 hover:text-blue-500 shadow-sm border border-slate-200/80 dark:border-slate-700 hover:scale-110 transition-all"
-              title="编辑书签"
-            >
-              <Settings2 size={13} />
-            </button>
-          </div>
         )}
       </div>
     );
@@ -320,25 +293,6 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
             </div>
           )}
         </a>
-      )}
-
-      {/* 悬停快捷编辑 */}
-      {!isBatchEditMode && onEdit && (
-        <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-slate-800/95 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-md p-1 absolute ${
-          isDetail ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
-        }`}>
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit(link);
-            }}
-            className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-            title="编辑"
-          >
-            <Settings2 size={13} />
-          </button>
-        </div>
       )}
     </div>
   );

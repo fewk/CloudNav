@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame,
-  PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, Star, Smartphone, List, Layers
+  PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, Smartphone, List, Layers
 } from 'lucide-react';
 import {
   DndContext,
@@ -2239,16 +2239,6 @@ function App() {
                 <span className="select-none tracking-wider">{initialChar}</span>
               )}
             </div>
-
-            {/* 置顶星标角标 */}
-            {link.pinned && (
-              <div
-                className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 rounded-full bg-amber-400 text-amber-950 shadow-sm border border-amber-300 flex items-center justify-center"
-                title="常用置顶推荐"
-              >
-                <Star size={11} fill="currentColor" />
-              </div>
-            )}
 
             {/* Emoji 标记角标 */}
             {link.emoji && (
