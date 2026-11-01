@@ -1,9 +1,12 @@
 import React, { memo } from 'react';
-import { LinkItem } from '../types';
+import { Star, Check, Settings2 } from 'lucide-react';
+import { LinkItem, CardStyle } from '../types';
+import { getAppGradient, getInitialChar } from '../services/colorUtils';
 
 export interface LinkCardProps {
   link: LinkItem;
-  isDetailedView: boolean;
+  cardStyle?: CardStyle;
+  isDetailedView?: boolean; // 向后兼容
   showDescription?: boolean;
   showTags?: boolean;
   openTarget?: '_blank' | '_self';
@@ -18,6 +21,7 @@ export interface LinkCardProps {
 
 export const LinkCard: React.FC<LinkCardProps> = memo(({
   link,
+  cardStyle,
   isDetailedView,
   showDescription = true,
   showTags = false,
@@ -30,53 +34,194 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   onEdit,
   onTagClick,
 }) => {
-  const hasDescription = showDescription && !!link.description;
-  const hasTags = isDetailedView && showTags && !!link.tags && link.tags.length > 0;
-  const hasExtra = (isDetailedView && hasDescription) || hasTags;
+  // 计算有效的卡片展示形态
+  const effectiveStyle: CardStyle = cardStyle ?? (isDetailedView ? 'detailed' : 'simple');
+  const isIconView = effectiveStyle === 'icon';
+  const isDetail = effectiveStyle === 'detailed';
+  const isSimple = effectiveStyle === 'simple';
 
+  const hasDescription = showDescription && !!link.description;
+  const hasTags = isDetail && showTags && !!link.tags && link.tags.length > 0;
+  const hasExtra = (isDetail && hasDescription) || hasTags;
+
+  const gradient = getAppGradient(link.title);
+  const initialChar = getInitialChar(link.title);
+
+  // 渲染图标内部内容（Favicon 或 iOS 灵动渐变首字母）
+  const renderIconContent = (sizeClass: string) => {
+    if (link.icon) {
+      return (
+        <img
+          src={link.icon}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className={`w-full h-full object-contain ${sizeClass}`}
+          onError={(e) => {
+            const target = e.target as HTMLElement;
+            target.style.display = 'none';
+          }}
+        />
+      );
+    }
+    return (
+      <span className="select-none font-bold tracking-wider">
+        {initialChar}
+      </span>
+    );
+  };
+
+  // --- 1. 📱 手机 APP 图标模式 (Icon Mode) ---
+  if (isIconView) {
+    return (
+      <div
+        className={`group relative flex flex-col items-center justify-start text-center p-2 rounded-2xl transition-all duration-200 select-none ${
+          isSelected
+            ? 'bg-red-50/80 dark:bg-red-950/40 ring-2 ring-red-400 dark:ring-red-700'
+            : isUnassignedHighlight
+              ? 'bg-amber-50/80 dark:bg-amber-950/30 ring-2 ring-amber-400 dark:ring-amber-700/50'
+              : 'hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
+        } ${isBatchEditMode ? 'cursor-pointer' : ''}`}
+        onClick={() => isBatchEditMode && onToggleSelection?.(link.id)}
+        onContextMenu={(e) => onContextMenu?.(e, link)}
+      >
+        {isBatchEditMode ? (
+          <div className="flex flex-col items-center w-full">
+            {/* 图标与角标外壳 */}
+            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-transform duration-200 group-hover:scale-105">
+              <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] shadow-sm ${
+                link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass}`
+              }`}>
+                {renderIconContent('p-1')}
+              </div>
+
+              {/* 批量编辑选中勾选框 */}
+              <div className={`absolute -top-1.5 -right-1.5 z-20 w-5 h-5 rounded-full flex items-center justify-center shadow-md transition-colors ${
+                isSelected ? 'bg-blue-600 text-white' : 'bg-white/95 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
+              }`}>
+                {isSelected && <Check size={12} strokeWidth={3} />}
+              </div>
+
+              {/* Emoji 标记（如果未被勾选框覆盖） */}
+              {link.emoji && !isBatchEditMode && (
+                <div className="absolute -top-1.5 -right-1.5 z-10 text-[12px] bg-white/95 dark:bg-slate-800/95 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-full w-5 h-5 flex items-center justify-center">
+                  {link.emoji}
+                </div>
+              )}
+            </div>
+
+            {/* 标题 */}
+            <div className="mt-2 w-full px-0.5">
+              <span className="text-[12px] sm:text-[12.5px] font-medium leading-[16px] text-slate-700 dark:text-slate-200 line-clamp-2 break-all">
+                {link.title}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <a
+            href={link.url}
+            target={openTarget === '_self' ? '_self' : '_blank'}
+            rel={openTarget === '_self' ? undefined : "noopener noreferrer"}
+            className="flex flex-col items-center w-full group/link"
+            title={link.description ? `${link.title} - ${link.description}` : link.title}
+          >
+            {/* 图标与角标外壳 */}
+            <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-all duration-200 group-hover:-translate-y-1 group-hover:scale-105 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.35)] group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
+              <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] ${
+                link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass} text-xl shadow-inner`
+              }`}>
+                {renderIconContent('p-1')}
+              </div>
+
+              {/* 置顶星标角标 */}
+              {link.pinned && (
+                <div
+                  className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 rounded-full bg-amber-400 text-amber-950 shadow-sm border border-amber-300 flex items-center justify-center"
+                  title="常用置顶推荐"
+                >
+                  <Star size={11} fill="currentColor" />
+                </div>
+              )}
+
+              {/* Emoji 标记角标 */}
+              {link.emoji && (
+                <div
+                  className="absolute -top-1.5 -right-1.5 z-10 text-[12px] bg-white/95 dark:bg-slate-800/95 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-full w-5 h-5 flex items-center justify-center select-none"
+                  title={`标记: ${link.emoji}`}
+                >
+                  {link.emoji}
+                </div>
+              )}
+            </div>
+
+            {/* 标题 */}
+            <div className="mt-2 w-full px-0.5">
+              <span className="text-[12px] sm:text-[12.5px] font-medium leading-[16px] text-slate-700 dark:text-slate-200 group-hover/link:text-blue-600 dark:group-hover/link:text-blue-400 transition-colors line-clamp-2 break-all">
+                {link.title}
+              </span>
+            </div>
+          </a>
+        )}
+
+        {/* 悬浮快捷编辑按钮 */}
+        {!isBatchEditMode && onEdit && (
+          <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onEdit(link);
+              }}
+              className="p-1 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-400 hover:text-blue-500 shadow-sm border border-slate-200/80 dark:border-slate-700 hover:scale-110 transition-all"
+              title="编辑书签"
+            >
+              <Settings2 size={13} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- 2. ⚡ 简约模式 (Simple Mode) 与 3. 📄 详情模式 (Detailed Mode) ---
   return (
     <div
-      className={`group relative transition-all duration-200 ${
-        isSelected 
-          ? 'bg-red-50 dark:bg-red-900/30 ring-1 ring-red-300 dark:ring-red-800' 
+      className={`group relative transition-all duration-200 border ${
+        isSelected
+          ? 'bg-red-50 dark:bg-red-950/40 border-red-300 dark:border-red-800 ring-1 ring-red-300 dark:ring-red-800'
           : isUnassignedHighlight
-            ? 'bg-amber-50/70 dark:bg-amber-900/20 ring-1 ring-amber-300 dark:ring-amber-800/50'
-            : 'bg-white dark:bg-slate-800'
-      } ${isBatchEditMode ? 'cursor-pointer' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
-        isDetailedView 
-          ? `flex flex-col rounded-[10px] p-[14px] ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
-          : 'flex items-center justify-between rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
+            ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/50 ring-1 ring-amber-300 dark:ring-amber-800/50'
+            : 'bg-white dark:bg-slate-800/90 border-slate-100/90 dark:border-slate-700/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]'
+      } ${
+        isBatchEditMode
+          ? 'cursor-pointer'
+          : isDetail
+            ? 'hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,0,0,0.06)] dark:hover:shadow-black/30'
+            : 'hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'
+      } ${
+        isDetail
+          ? `flex flex-col rounded-xl p-3.5 ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}`
+          : 'flex items-center justify-between rounded-xl p-2.5 px-3'
       }`}
       onClick={() => isBatchEditMode && onToggleSelection?.(link.id)}
       onContextMenu={(e) => onContextMenu?.(e, link)}
     >
-      {/* 链接内容 - 在批量编辑模式下不使用a标签 */}
+      {/* 链接内容 - 批量模式使用 div，正常模式使用 a 标签 */}
       {isBatchEditMode ? (
         <div className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-          isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
+          isDetail ? 'flex-col' : 'items-center gap-2.5 w-full'
         }`}>
-          {/* 第一行：图标和标题 */}
-          <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
-              isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-            }`}>
-              {link.icon ? (
-                <img 
-                  src={link.icon} 
-                  alt="" 
-                  loading="lazy" 
-                  decoding="async" 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
-                />
-              ) : (
-                link.title.charAt(0)
-              )}
+          {/* 第一行：图标与标题 */}
+          <div className={`flex items-center gap-2.5 ${isDetail ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
+            <div className={`flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
+              isDetail ? 'w-10 h-10 rounded-xl' : 'w-7 h-7 rounded-lg text-xs'
+            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60 p-1.5' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
+              {renderIconContent('p-0.5')}
             </div>
-            
+
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-[16px]' : 'text-[14px]'
+              <h3 className={`font-semibold text-slate-800 dark:text-slate-100 truncate ${
+                isDetail ? 'text-[15px]' : 'text-[13.5px]'
               }`} title={link.title}>
                 {link.title}
               </h3>
@@ -87,21 +232,21 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
               )}
             </div>
           </div>
-          
-          {/* 第二行：描述文字 */}
-          {isDetailedView && hasDescription && (
-            <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
+
+          {/* 第二行：描述文字 (详情模式) */}
+          {isDetail && hasDescription && (
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
               {link.description}
             </p>
           )}
 
-          {/* 第三行：标签展示 */}
+          {/* 第三行：标签 (详情模式) */}
           {hasTags && (
             <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
               {link.tags!.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
+                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-300 select-none"
                 >
                   #{tag}
                 </span>
@@ -115,32 +260,21 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
           target={openTarget === '_self' ? '_self' : '_blank'}
           rel={openTarget === '_self' ? undefined : "noopener noreferrer"}
           className={`flex flex-1 min-w-0 overflow-hidden h-full ${
-            isDetailedView ? 'flex-col' : 'items-center gap-2.5 w-full'
+            isDetail ? 'flex-col' : 'items-center gap-2.5 w-full'
           }`}
-          title={isDetailedView ? link.url : (hasDescription ? link.description : link.url)}
+          title={isDetail ? link.url : (hasDescription ? link.description : link.url)}
         >
-          {/* 第一行：图标和标题 */}
-          <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
-              isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-            }`}>
-              {link.icon ? (
-                <img 
-                  src={link.icon} 
-                  alt="" 
-                  loading="lazy" 
-                  decoding="async" 
-                  className="w-full h-full object-contain" 
-                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
-                />
-              ) : (
-                link.title.charAt(0)
-              )}
+          {/* 第一行：图标与标题 */}
+          <div className={`flex items-center gap-2.5 ${isDetail ? 'w-full gap-3' : 'w-full min-w-0 flex-1'}`}>
+            <div className={`flex items-center justify-center shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
+              isDetail ? 'w-10 h-10 rounded-xl' : 'w-7 h-7 rounded-lg text-xs'
+            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60 p-1.5' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
+              {renderIconContent('p-0.5')}
             </div>
-            
+
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate whitespace-nowrap overflow-hidden text-ellipsis group-hover:text-[#ff6000] dark:group-hover:text-blue-400 transition-colors ${
-                isDetailedView ? 'text-[16px]' : 'text-[14px]'
+              <h3 className={`font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors ${
+                isDetail ? 'text-[15px]' : 'text-[13.5px]'
               }`} title={link.title}>
                 {link.title}
               </h3>
@@ -151,15 +285,15 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
               )}
             </div>
           </div>
-          
-          {/* 第二行：描述文字 */}
-          {isDetailedView && hasDescription && (
-            <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
+
+          {/* 第二行：描述文字 (详情模式) */}
+          {isDetail && hasDescription && (
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
               {link.description}
             </p>
           )}
 
-          {/* 第三行：标签展示 */}
+          {/* 第三行：标签 (详情模式) */}
           {hasTags && (
             <div className="flex flex-nowrap overflow-hidden items-center gap-1.5 mt-2.5 w-full whitespace-nowrap">
               {link.tags!.map((tag, idx) => (
@@ -170,7 +304,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
                     e.stopPropagation();
                     onTagClick?.(tag);
                   }}
-                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] hover:bg-orange-50 hover:text-[#ff6000] dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
+                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 dark:bg-slate-700/70 dark:text-slate-300 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 transition-colors cursor-pointer select-none"
                   title={`按标签 #${tag} 筛选`}
                 >
                   #{tag}
@@ -178,28 +312,32 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
               ))}
             </div>
           )}
-          {!isDetailedView && hasDescription && (
-            <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[200px] bg-black text-white text-xs p-2 rounded opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate">
+
+          {/* 简约模式下的浮动 Tooltip */}
+          {isSimple && hasDescription && (
+            <div className="tooltip-custom absolute left-0 -top-8 w-max max-w-[220px] bg-slate-900/95 text-white text-xs px-2.5 py-1.5 rounded-md shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 transition-all z-20 pointer-events-none truncate border border-slate-700">
               {link.description}
             </div>
           )}
         </a>
       )}
 
-      {/* Hover Actions */}
+      {/* 悬停快捷编辑 */}
       {!isBatchEditMode && onEdit && (
-        <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-md p-1 absolute ${
-          isDetailedView ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
+        <div className={`flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-slate-800/95 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-md p-1 absolute ${
+          isDetail ? 'top-3 right-3' : 'top-1/2 -translate-y-1/2 right-2'
         }`}>
-            <button 
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(link); }}
-                className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
-                title="编辑"
-            >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.65-.07-.97l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.08-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.32-.07.64-.07.97c0 .33.03.65.07.97l-2.11 1.63c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.08.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.11-1.63Z" fill="currentColor"/>
-                </svg>
-            </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEdit(link);
+            }}
+            className="p-1 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+            title="编辑"
+          >
+            <Settings2 size={13} />
+          </button>
         </div>
       )}
     </div>

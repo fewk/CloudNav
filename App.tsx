@@ -4,7 +4,7 @@ import {
   Search, Plus, Upload, Moon, Sun, Menu, 
   Trash2, Edit2, Loader2, Cloud, CheckCircle2, AlertCircle,
   Pin, Settings, Lock, CloudCog, Github, GitFork, GripVertical, Save, CheckSquare, LogOut, ExternalLink, X, Flame,
-  PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp
+  PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronUp, Star, Smartphone, List, Layers
 } from 'lucide-react';
 import {
   DndContext,
@@ -25,7 +25,8 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, SiteSettings } from './types';
+import { LinkItem, Category, DEFAULT_CATEGORIES, INITIAL_LINKS, WebDavConfig, AIConfig, SearchMode, ExternalSearchSource, SearchConfig, SiteSettings, CardStyle } from './types';
+import { getAppGradient, getInitialChar } from './services/colorUtils';
 import { normalizeCategories } from './services/categoryUtils';
 import Icon from './components/Icon';
 import ContextMenu from './components/ContextMenu';
@@ -775,10 +776,24 @@ function App() {
   };
 
   // 视图模式切换处理函数
-  const handleViewModeChange = (cardStyle: 'detailed' | 'simple') => {
+  const handleViewModeChange = (cardStyle: CardStyle) => {
     const newSiteSettings = { ...siteSettings, cardStyle };
     setSiteSettings(newSiteSettings);
     localStorage.setItem('cloudnav_site_settings', JSON.stringify(newSiteSettings));
+    if (authToken) {
+      fetch('/api/storage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-password': authToken
+        },
+        body: JSON.stringify({
+          saveConfig: 'website',
+          websiteConfig: newSiteSettings
+        })
+      }).catch(err => console.warn('Failed to sync cardStyle to KV:', err));
+    }
+
   };
 
   // --- Batch Edit Functions ---
@@ -1305,7 +1320,21 @@ function App() {
       
       if (newSiteSettings) {
           setSiteSettings(newSiteSettings);
-          localStorage.setItem('cloudnav_site_settings', JSON.stringify(newSiteSettings));
+    localStorage.setItem('cloudnav_site_settings', JSON.stringify(newSiteSettings));
+          if (authToken) {
+      fetch('/api/storage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-password': authToken
+        },
+        body: JSON.stringify({
+          saveConfig: 'website',
+          websiteConfig: newSiteSettings
+        })
+      }).catch(err => console.warn('Failed to sync cardStyle to KV:', err));
+    }
+
       }
       
       if (authToken) {
@@ -2143,6 +2172,14 @@ function App() {
 
   // --- Render Components ---
 
+  // 响应式网格列数自适应辅助函数
+  const getCardGridClass = (cardStyle?: CardStyle) => {
+    if (cardStyle === 'icon') {
+      return 'grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-9 2xl:grid-cols-10 gap-2.5 sm:gap-4';
+    }
+    return 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4';
+  };
+
   // 创建可排序的链接卡片组件
   const SortableLinkCard: React.FC<{ link: LinkItem; key?: string }> = ({ link }) => {
     const {
@@ -2154,30 +2191,115 @@ function App() {
       isDragging,
     } = useSortable({ id: link.id });
     
-    const isDetailedView = siteSettings.cardStyle === 'detailed';
+    const cardStyle = siteSettings.cardStyle || 'detailed';
+    const isIconView = cardStyle === 'icon';
+    const isDetailedView = cardStyle === 'detailed';
     const showDesc = (siteSettings.showDescription !== false) && isDetailedView && !!link.description;
     const showTags = (siteSettings.showTags === true) && isDetailedView && !!link.tags && link.tags.length > 0;
     const hasExtra = showDesc || (isDetailedView && showTags);
+
+    const gradient = getAppGradient(link.title);
+    const initialChar = getInitialChar(link.title);
     
     const style = {
       transform: CSS.Transform.toString(transform),
       transition: isDragging ? 'none' : transition,
-      opacity: isDragging ? 0.5 : 1,
+      opacity: isDragging ? 0.4 : 1,
       zIndex: isDragging ? 1000 : 'auto',
     };
+
+    if (isIconView) {
+      return (
+        <div
+          ref={setNodeRef}
+          style={style}
+          className={`group relative flex flex-col items-center justify-start text-center p-2 rounded-2xl transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+            isSortingMode || isSortingPinned
+              ? 'bg-blue-50/70 dark:bg-blue-900/30 ring-2 ring-blue-300 dark:ring-blue-700' 
+              : 'hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
+          } ${isDragging ? 'shadow-2xl scale-110 z-50' : 'hover:-translate-y-1'}`}
+          {...attributes}
+          {...listeners}
+        >
+          {/* 图标与角标外壳 */}
+          <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] transition-transform duration-200 group-hover:scale-105">
+            <div className={`w-full h-full rounded-[18px] overflow-hidden flex items-center justify-center border border-black/[0.08] dark:border-white/[0.12] ${
+              link.icon ? 'bg-white dark:bg-slate-800 p-2' : `${gradient.gradientClass} ${gradient.textClass} text-xl font-bold shadow-inner`
+            }`}>
+              {link.icon ? (
+                <img
+                  src={link.icon}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-contain p-1"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
+              ) : (
+                <span className="select-none tracking-wider">{initialChar}</span>
+              )}
+            </div>
+
+            {/* 置顶星标角标 */}
+            {link.pinned && (
+              <div
+                className="absolute -top-1.5 -left-1.5 z-10 w-5 h-5 rounded-full bg-amber-400 text-amber-950 shadow-sm border border-amber-300 flex items-center justify-center"
+                title="常用置顶推荐"
+              >
+                <Star size={11} fill="currentColor" />
+              </div>
+            )}
+
+            {/* Emoji 标记角标 */}
+            {link.emoji && (
+              <div
+                className="absolute -top-1.5 -right-1.5 z-10 text-[12px] bg-white/95 dark:bg-slate-800/95 shadow-sm border border-slate-200/80 dark:border-slate-700 rounded-full w-5 h-5 flex items-center justify-center select-none"
+                title={`标记: ${link.emoji}`}
+              >
+                {link.emoji}
+              </div>
+            )}
+          </div>
+
+          {/* 标题 */}
+          <div className="mt-2 w-full px-0.5">
+            <span className="text-[12px] sm:text-[12.5px] font-medium leading-[16px] text-slate-700 dark:text-slate-200 line-clamp-2 break-all">
+              {link.title}
+            </span>
+          </div>
+
+          {/* 排序模式下的快捷删除按钮 */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleDeleteLinkInSorting(link);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="absolute -top-1 -right-1 w-6 h-6 flex items-center justify-center rounded-full bg-red-50 hover:bg-red-500 text-red-500 hover:text-white border border-red-200 dark:border-red-800/80 dark:bg-red-950/60 dark:hover:bg-red-600 dark:text-red-400 dark:hover:text-white transition-all shadow-sm hover:scale-110 active:scale-95 z-30 cursor-pointer"
+            title={`快捷删除 "${link.title}"`}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div
         ref={setNodeRef}
         style={style}
-        className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden ${
+        className={`group relative transition-all duration-200 cursor-grab active:cursor-grabbing min-w-0 max-w-full overflow-hidden border ${
           isSortingMode || isSortingPinned
-            ? 'bg-blue-50/50 dark:bg-blue-900/30 ring-1 ring-blue-300 dark:ring-blue-700' 
-            : 'bg-white dark:bg-slate-800'
-        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-1 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
+            ? 'bg-blue-50/70 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 ring-1 ring-blue-300 dark:ring-blue-700' 
+            : 'bg-white dark:bg-slate-800/90 border-slate-100/90 dark:border-slate-700/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]'
+        } ${isDragging ? 'shadow-2xl scale-105 z-50' : 'hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:hover:shadow-black/20'} ${
           isDetailedView 
-            ? `flex flex-col rounded-[10px] p-[14px] ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
-            : 'flex items-center rounded-[10px] p-2.5 px-3 hover:-translate-y-0.5'
+            ? `flex flex-col rounded-xl p-3.5 ${hasExtra ? 'min-h-[96px]' : 'min-h-[68px] justify-center'}` 
+            : 'flex items-center rounded-xl p-2.5 px-3'
         }`}
         {...attributes}
         {...listeners}
@@ -2187,19 +2309,19 @@ function App() {
         }`}>
           {/* 第一行：图标和标题 */}
           <div className={`flex items-center gap-2.5 ${isDetailedView ? 'w-full gap-3 pr-7' : 'w-full min-w-0 flex-1'}`}>
-            <div className={`text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden bg-slate-50 dark:bg-slate-700/60 border border-slate-100 dark:border-slate-700/60 ${
+            <div className={`flex items-center justify-center font-bold uppercase shrink-0 overflow-hidden border border-slate-100 dark:border-slate-700/60 ${
               isDetailedView ? 'w-10 h-10 rounded-xl p-1.5' : 'w-7 h-7 rounded-lg p-1 text-xs'
-            }`}>
+            } ${link.icon ? 'bg-slate-50 dark:bg-slate-700/60' : `${gradient.gradientClass} ${gradient.textClass}`}`}>
               {link.icon ? (
                 <img src={link.icon} alt="" loading="lazy" decoding="async" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               ) : (
-                link.title.charAt(0)
+                <span className="select-none">{initialChar}</span>
               )}
             </div>
             
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-              <h3 className={`font-semibold text-[#3c3c3c] dark:text-slate-100 truncate overflow-hidden text-ellipsis ${
-                isDetailedView ? 'text-[16px]' : 'text-[14px]'
+              <h3 className={`font-semibold text-slate-800 dark:text-slate-100 truncate ${
+                isDetailedView ? 'text-[15px]' : 'text-[13.5px]'
               }`} title={link.title}>
                 {link.title}
               </h3>
@@ -2213,7 +2335,7 @@ function App() {
           
           {/* 第二行：描述文字 */}
           {showDesc && (
-            <p className="text-[12px] text-[#8f8f8f] dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-[#5a5a5a] dark:group-hover:text-slate-200 transition-colors">
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-[18px] line-clamp-2 h-[36px] mt-2 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
               {link.description}
             </p>
           )}
@@ -2224,7 +2346,7 @@ function App() {
               {link.tags!.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#f1f7fc] text-[#9ca7ae] dark:bg-slate-700/60 dark:text-slate-300 select-none"
+                  className="inline-flex items-center shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-300 select-none"
                 >
                   #{tag}
                 </span>
@@ -2292,11 +2414,12 @@ function App() {
 
     return (
       <div className="space-y-3">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className={getCardGridClass(siteSettings.cardStyle)}>
           {renderLinks.map(link => (
             <LinkCard
               key={link.id}
               link={link}
+              cardStyle={siteSettings.cardStyle}
               isDetailedView={isDetailedView}
               showDescription={siteSettings.showDescription !== false}
               showTags={siteSettings.showTags === true}
@@ -2871,28 +2994,42 @@ function App() {
 
           <div className="flex items-center gap-2">
             {/* 视图切换控制器 - 移动端：搜索框展开时隐藏，桌面端始终显示 */}
-            <div className={`${isMobileSearchOpen ? 'hidden' : 'flex'} lg:flex items-center bg-slate-100 dark:bg-slate-700 rounded-full p-1`}>
+            <div className={`${isMobileSearchOpen ? 'hidden' : 'flex'} lg:flex items-center bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700/60 rounded-full p-0.5 shadow-inner`}>
               <button
                 onClick={() => handleViewModeChange('simple')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 text-xs font-medium rounded-full transition-all ${
                   siteSettings.cardStyle === 'simple'
-                    ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
-                title="简约版视图"
+                title="简约视图 (列表模式)"
               >
-                简约
+                <List size={13} className="hidden sm:inline" />
+                <span>简约</span>
               </button>
               <button
                 onClick={() => handleViewModeChange('detailed')}
-                className={`px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 text-xs font-medium rounded-full transition-all ${
                   siteSettings.cardStyle === 'detailed'
-                    ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
-                title="详情版视图"
+                title="详情视图 (图文模式)"
               >
-                详情
+                <Layers size={13} className="hidden sm:inline" />
+                <span>详情</span>
+              </button>
+              <button
+                onClick={() => handleViewModeChange('icon')}
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1 text-xs font-medium rounded-full transition-all ${
+                  siteSettings.cardStyle === 'icon'
+                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm font-semibold'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+                title="图标视图 (手机 APP 桌面模式)"
+              >
+                <Smartphone size={13} className="hidden sm:inline" />
+                <span>图标</span>
               </button>
             </div>
 
@@ -3104,11 +3241,12 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  <div className={getCardGridClass(siteSettings.cardStyle)}>
                     {visibleSearchLinks.map(link => (
                       <LinkCard
                         key={link.id}
                         link={link}
+                        cardStyle={siteSettings.cardStyle}
                         isDetailedView={isDetailedView}
                         showDescription={siteSettings.showDescription !== false}
                         showTags={siteSettings.showTags === true}
@@ -3146,10 +3284,10 @@ function App() {
             <>
               {/* 热门推荐 / 置顶专区 (#pinned) */}
               {pinnedLinks.length > 0 && (
-                <section id="pinned" className="scroll-mt-6 space-y-4">
+                <section id="pinned" className="scroll-mt-6 space-y-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-500/[0.04] via-blue-500/[0.02] to-transparent dark:from-amber-400/[0.03] dark:via-blue-500/[0.02] border border-amber-200/50 dark:border-amber-900/30 shadow-[0_1px_6px_rgba(0,0,0,0.02)]">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-1.5 h-4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full shrink-0"></div>
+                      <div className="w-1.5 h-4 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full shrink-0"></div>
                       <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                         热门推荐
                       </h2>
@@ -3199,7 +3337,7 @@ function App() {
                         items={pinnedLinks.map(link => link.id)}
                         strategy={rectSortingStrategy}
                       >
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                        <div className={getCardGridClass(siteSettings.cardStyle)}>
                           {pinnedLinks.map(link => (
                             <SortableLinkCard key={link.id} link={link} />
                           ))}
@@ -3336,7 +3474,7 @@ function App() {
                           items={catLinks.map(link => link.id)}
                           strategy={rectSortingStrategy}
                         >
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                          <div className={getCardGridClass(siteSettings.cardStyle)}>
                             {catLinks.map(link => (
                               <SortableLinkCard key={link.id} link={link} />
                             ))}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw, FolderTree, Upload, CloudCog } from 'lucide-react';
+import { X, Save, Bot, Key, Globe, Sparkles, PauseCircle, Wrench, Box, Copy, Check, LayoutTemplate, RefreshCw, Info, Download, Sidebar, Keyboard, MousePointerClick, AlertTriangle, Package, Zap, Menu, ExternalLink, FileText, Tag, Search, Plus, Trash2, RotateCcw, FolderTree, Upload, CloudCog, LayoutGrid, Smartphone, Layers, List } from 'lucide-react';
 import { AIConfig, LinkItem, Category, SiteSettings, ExternalSearchSource, WebDavConfig, SearchConfig } from '../types';
 import { generateLinkDescription } from '../services/geminiService';
 import CategoryManagerView from './CategoryManagerView';
@@ -233,7 +233,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         const next = { ...prev, [key]: value };
         
         // 如果是身份验证过期天数、打开方式、介绍或标签显示修改，立即保存到 KV 空间
-        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'showDescription' || key === 'showTags' || key === 'visibleCategoryCount' || key === 'categoryLinkLimit') && authToken) {
+        if ((key === 'passwordExpiryDays' || key === 'openTarget' || key === 'cardStyle' || key === 'showDescription' || key === 'showTags' || key === 'visibleCategoryCount' || key === 'categoryLinkLimit') && authToken) {
             saveWebsiteConfigToKV(next);
         }
         
@@ -1271,6 +1271,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     {(localSiteSettings.openTarget || '_blank') === '_blank' 
                                         ? '点击书签卡片时，在新的浏览器标签页中打开站点' 
                                         : '点击书签卡片时，直接在当前标签页中跳转'}
+                                </p>
+                            </div>
+
+                            {/* 默认卡片显示风格 */}
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    默认卡片风格
+                                </label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSiteChange('cardStyle', 'icon')}
+                                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+                                            (localSiteSettings.cardStyle || 'detailed') === 'icon'
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <Smartphone size={18} />
+                                        <span>手机图标</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSiteChange('cardStyle', 'simple')}
+                                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+                                            localSiteSettings.cardStyle === 'simple'
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <List size={18} />
+                                        <span>简约列表</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSiteChange('cardStyle', 'detailed')}
+                                        className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all ${
+                                            (localSiteSettings.cardStyle || 'detailed') === 'detailed'
+                                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-sm'
+                                                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800'
+                                        }`}
+                                    >
+                                        <Layers size={18} />
+                                        <span>详细图文</span>
+                                    </button>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    {(localSiteSettings.cardStyle || 'detailed') === 'icon'
+                                        ? '手机 APP 风格：采用精美 Squircle 圆角大图标与居中标题，原生主屏幕质感'
+                                        : localSiteSettings.cardStyle === 'simple'
+                                            ? '简约风格：紧凑单行横条，高效空间利用'
+                                            : '详细风格：图文并茂，展示描述说明与分类标签'}
                                 </p>
                             </div>
 
