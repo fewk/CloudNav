@@ -50,7 +50,7 @@ export const LinkCard: React.FC<LinkCardProps> = memo(({
   const renderAppIcon = () => {
     if (link.icon) {
       return (
-        <div className="w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] bg-white dark:bg-slate-800 border border-black/[0.06] dark:border-white/[0.1] shadow-sm flex items-center justify-center p-2 relative overflow-hidden transition-all duration-200">
+        <div className="w-14 h-14 sm:w-[58px] sm:h-[58px] rounded-[18px] bg-white dark:bg-slate-800 border border-black/[0.06] dark:border-white/[0.1] shadow-sm flex items-center justify-center p-0 relative overflow-hidden transition-all duration-200">
           <img
             src={link.icon}
             alt=""

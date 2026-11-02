@@ -2224,7 +2224,7 @@ function App() {
           {/* 图标与角标外壳 */}
           <div className="relative w-14 h-14 sm:w-[58px] sm:h-[58px] flex items-center justify-center transition-all duration-200 group-hover:-translate-y-1.5 group-hover:scale-105 active:scale-95 shadow-[0_2px_8px_rgba(0,0,0,0.06)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.3)] group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.12)] rounded-[18px]">
             {link.icon ? (
-              <div className="w-full h-full rounded-[18px] bg-white dark:bg-slate-800 border border-black/[0.06] dark:border-white/[0.1] shadow-sm flex items-center justify-center p-2 overflow-hidden">
+              <div className="w-full h-full rounded-[18px] bg-white dark:bg-slate-800 border border-black/[0.06] dark:border-white/[0.1] shadow-sm flex items-center justify-center p-0 overflow-hidden">
                 <img
                   src={link.icon}
                   alt=""
